@@ -11,7 +11,7 @@ interface Chunk {
   category: string;
 }
 
-type Phase = "input" | "loading" | "review" | "summary";
+type Phase = "input" | "loading" | "ready" | "review" | "summary";
 
 export interface FlaggedChunk {
   chunk: Chunk;
@@ -19,11 +19,63 @@ export interface FlaggedChunk {
   note: string;
 }
 
-const BASE_MS = 120_000;
-const PER_LINE_MS = 2000;
+const BASE_MS = 60_000;
+const PER_LINE_MS = 1000;
 
 function chunkDuration(lines: number): number {
   return BASE_MS + lines * PER_LINE_MS;
+}
+
+// Scanning animation for loading phase
+function ScanAnimation() {
+  return (
+    <div className="flex flex-col items-center gap-8">
+      <div className="relative w-64 h-64">
+        {/* Rotating rings */}
+        <div className="absolute inset-0 border-2 border-neutral-800 rounded-full animate-[spin_8s_linear_infinite]" />
+        <div className="absolute inset-4 border border-neutral-700 rounded-full animate-[spin_6s_linear_infinite_reverse]" />
+        <div className="absolute inset-8 border border-neutral-700/50 rounded-full animate-[spin_4s_linear_infinite]" />
+
+        {/* Scanning line */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="w-full h-px bg-gradient-to-r from-transparent via-white/30 to-transparent animate-[pulse_2s_ease-in-out_infinite]" />
+        </div>
+
+        {/* Centre dot */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="w-3 h-3 bg-white/60 rounded-full animate-[pulse_1.5s_ease-in-out_infinite]" />
+        </div>
+
+        {/* Floating diff symbols */}
+        {["+", "-", "@@", "+", "-", "+"].map((sym, i) => (
+          <div
+            key={i}
+            className="absolute text-xs animate-[float_3s_ease-in-out_infinite]"
+            style={{
+              color:
+                sym === "+"
+                  ? "rgb(74 222 128 / 0.4)"
+                  : sym === "-"
+                    ? "rgb(248 113 113 / 0.4)"
+                    : "rgb(148 163 184 / 0.3)",
+              top: `${20 + Math.sin(i * 1.2) * 30}%`,
+              left: `${15 + ((i * 17) % 70)}%`,
+              animationDelay: `${i * 0.5}s`,
+            }}
+          >
+            {sym}
+          </div>
+        ))}
+      </div>
+
+      <div className="text-center">
+        <p className="text-white text-lg font-medium mb-2">Analysing diff</p>
+        <p className="text-neutral-500 text-sm">
+          Grouping changes into reviewable chunks...
+        </p>
+      </div>
+    </div>
+  );
 }
 
 export default function App() {
@@ -45,32 +97,43 @@ export default function App() {
     }
   }, [currentIndex, chunks.length]);
 
-  // Spacebar to pause, Enter to resume (when paused)
+  // Spacebar to pause (review), Enter to resume (paused), Space to start (ready)
   useEffect(() => {
-    if (phase !== "review") return;
-
     function handleKeyDown(e: KeyboardEvent) {
+      if (phase === "ready" && e.code === "Space") {
+        e.preventDefault();
+        setPhase("review");
+        return;
+      }
+
+      if (phase !== "review") return;
+
       if (e.code === "Space" && !paused) {
         e.preventDefault();
         setPaused(true);
         setTimeout(() => noteRef.current?.focus(), 50);
-      } else if (e.code === "Enter" && paused && e.target === noteRef.current) {
-        // Shift+Enter for newlines in the note
+      } else if (
+        e.code === "Enter" &&
+        paused &&
+        e.target === noteRef.current
+      ) {
         if (e.shiftKey) return;
         e.preventDefault();
 
-        // Flag if there's a note
         if (note.trim()) {
           setFlagged((prev) => [
             ...prev,
-            { chunk: chunks[currentIndex], index: currentIndex, note: note.trim() },
+            {
+              chunk: chunks[currentIndex],
+              index: currentIndex,
+              note: note.trim(),
+            },
           ]);
         }
         setNote("");
         setPaused(false);
         advance();
       } else if (e.code === "Escape" && paused) {
-        // Escape to resume without flagging
         e.preventDefault();
         setNote("");
         setPaused(false);
@@ -103,7 +166,7 @@ export default function App() {
       setFlagged([]);
       setCurrentIndex(0);
       setPaused(false);
-      setPhase("review");
+      setPhase("ready");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
       setPhase("input");
@@ -111,7 +174,7 @@ export default function App() {
   }
 
   // --- Input phase ---
-  if (phase === "input" || phase === "loading") {
+  if (phase === "input") {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="w-full max-w-lg px-6">
@@ -129,17 +192,47 @@ export default function App() {
               placeholder="https://github.com/owner/repo/pull/123"
               required
               className="w-full px-4 py-3 bg-neutral-900 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:border-neutral-500"
-              disabled={phase === "loading"}
             />
             <button
               type="submit"
-              disabled={phase === "loading"}
-              className="px-6 py-3 bg-white text-black font-medium rounded-lg hover:bg-neutral-200 disabled:opacity-50 transition-colors"
+              className="px-6 py-3 bg-white text-black font-medium rounded-lg hover:bg-neutral-200 transition-colors"
             >
-              {phase === "loading" ? "Analysing PR..." : "Start Review"}
+              Start Review
             </button>
           </form>
           {error && <p className="mt-4 text-red-400 text-sm">{error}</p>}
+        </div>
+      </div>
+    );
+  }
+
+  // --- Loading phase ---
+  if (phase === "loading") {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <ScanAnimation />
+      </div>
+    );
+  }
+
+  // --- Ready phase ---
+  if (phase === "ready") {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-6xl font-bold text-white mb-4">
+            {chunks.length}
+          </div>
+          <p className="text-neutral-400 text-lg mb-2">
+            chunks ready for review
+          </p>
+          <p className="text-neutral-600 text-sm mb-8">
+            ~{Math.ceil((chunks.length * BASE_MS) / 60_000)} min at 1 min per
+            card
+          </p>
+          <div className="animate-pulse">
+            <p className="text-white text-sm">Press spacebar to begin</p>
+          </div>
         </div>
       </div>
     );
@@ -150,7 +243,9 @@ export default function App() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="w-full max-w-2xl px-6">
-          <h1 className="text-3xl font-bold mb-2 text-white">Review Complete</h1>
+          <h1 className="text-3xl font-bold mb-2 text-white">
+            Review Complete
+          </h1>
           <p className="text-neutral-400 mb-6">
             {flagged.length} of {chunks.length} chunks flagged
           </p>
@@ -173,7 +268,9 @@ export default function App() {
                     </span>
                   </div>
                   <p className="text-white text-sm mb-1">{f.chunk.summary}</p>
-                  <p className="text-neutral-500 text-xs mb-2">{f.chunk.files}</p>
+                  <p className="text-neutral-500 text-xs mb-2">
+                    {f.chunk.files}
+                  </p>
                   <div className="bg-neutral-800 rounded px-3 py-2">
                     <p className="text-yellow-300 text-sm whitespace-pre-wrap">
                       {f.note}
