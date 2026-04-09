@@ -2,9 +2,14 @@ module github.com/benaskins/revue
 
 go 1.26.1
 
-require github.com/benaskins/axon v0.6.0
+require (
+	github.com/benaskins/axon v0.6.0
+	github.com/benaskins/axon-talk v0.9.1
+)
 
 require (
+	github.com/benaskins/axon-tape v0.1.1 // indirect
+	github.com/benaskins/axon-tool v0.3.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/caarlos0/env/v11 v11.3.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect

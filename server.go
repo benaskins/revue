@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/benaskins/axon"
+	"github.com/benaskins/axon-talk"
 )
 
 // Server is the revue HTTP server.
@@ -14,6 +15,7 @@ type Server struct {
 	mux         *http.ServeMux
 	staticFiles *embed.FS
 	github      *GitHubClient
+	chunker     *Chunker
 }
 
 // Option configures a Server.
@@ -33,6 +35,13 @@ func WithGitHubToken(token string) Option {
 	}
 }
 
+// WithLLM sets the LLM client and model for diff chunking.
+func WithLLM(client talk.LLMClient, model string) Option {
+	return func(s *Server) {
+		s.chunker = NewChunker(client, model)
+	}
+}
+
 // NewServer creates a new revue server.
 func NewServer(opts ...Option) *Server {
 	s := &Server{
@@ -48,6 +57,7 @@ func NewServer(opts ...Option) *Server {
 func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/health", s.handleHealth)
 	s.mux.HandleFunc("POST /api/diff", s.handleDiff)
+	s.mux.HandleFunc("POST /api/chunks", s.handleChunks)
 }
 
 // Handler returns the API handler.
@@ -104,4 +114,48 @@ func (s *Server) handleDiff(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(diffResponse{Ref: ref, Diff: diff})
+}
+
+type chunksRequest struct {
+	URL string `json:"url"`
+}
+
+func (s *Server) handleChunks(w http.ResponseWriter, r *http.Request) {
+	if s.github == nil {
+		http.Error(w, "GitHub token not configured", http.StatusServiceUnavailable)
+		return
+	}
+	if s.chunker == nil {
+		http.Error(w, "LLM not configured", http.StatusServiceUnavailable)
+		return
+	}
+
+	var req chunksRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	ref, err := ParsePRURL(req.URL)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	diff, err := s.github.FetchDiff(r.Context(), ref)
+	if err != nil {
+		slog.Error("failed to fetch diff", "error", err, "ref", ref)
+		http.Error(w, "failed to fetch diff", http.StatusBadGateway)
+		return
+	}
+
+	result, err := s.chunker.Chunk(r.Context(), diff)
+	if err != nil {
+		slog.Error("failed to chunk diff", "error", err, "ref", ref)
+		http.Error(w, "failed to chunk diff", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(result)
 }
