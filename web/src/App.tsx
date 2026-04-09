@@ -10,6 +10,7 @@ import {
 } from "./api";
 import FlashCard from "./FlashCard";
 import TimerBar from "./TimerBar";
+import { useTimer } from "./useTimer";
 import "./index.css";
 
 type Phase = "input" | "loading" | "ready" | "review" | "summary";
@@ -599,26 +600,140 @@ export default function App() {
   const duration = chunkDuration(currentChunk.lines);
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <ReviewPhase
+      chunk={currentChunk}
+      index={currentIndex}
+      total={chunks.length}
+      duration={duration}
+      paused={paused}
+      note={note}
+      noteRef={noteRef}
+      flaggedCount={flagged.length}
+      onNoteChange={setNote}
+      onComplete={advance}
+    />
+  );
+}
+
+// --- Review phase as separate component (needs its own timer state) ---
+
+const PROMPTS_CALM = [
+  "Press spacebar if the code scares you",
+  "Observe the data carefully",
+  "Trust your instincts",
+];
+
+const PROMPTS_URGENT = [
+  "Time is running out",
+  "Decide now",
+  "Do you see it?",
+  "Look closer",
+];
+
+const PROMPTS_CRITICAL = [
+  "This bin is about to close",
+  "Speak now",
+  "Last chance",
+];
+
+function ReviewPhase({
+  chunk,
+  index,
+  total,
+  duration,
+  paused,
+  note,
+  noteRef,
+  flaggedCount,
+  onNoteChange,
+  onComplete,
+}: {
+  chunk: Chunk;
+  index: number;
+  total: number;
+  duration: number;
+  paused: boolean;
+  note: string;
+  noteRef: React.RefObject<HTMLTextAreaElement | null>;
+  flaggedCount: number;
+  onNoteChange: (v: string) => void;
+  onComplete: () => void;
+}) {
+  const { progress } = useTimer(duration, paused);
+
+  const urgent = progress > 0.7;
+  const critical = progress > 0.9;
+
+  const prompts = critical
+    ? PROMPTS_CRITICAL
+    : urgent
+      ? PROMPTS_URGENT
+      : PROMPTS_CALM;
+
+  const promptMessage = useRotatingMessage(
+    prompts,
+    critical ? 1200 : urgent ? 1800 : 3000,
+  );
+
+  const borderColor = critical
+    ? "var(--lumon-red)"
+    : urgent
+      ? "var(--lumon-yellow)"
+      : "var(--lumon-border)";
+
+  // Vignette intensifies with urgency
+  const vignetteOpacity = critical ? 0.5 : urgent ? 0.25 : 0;
+
+  return (
+    <div className="min-h-screen flex flex-col relative">
+      {/* Urgency vignette */}
+      {vignetteOpacity > 0 && (
+        <div
+          className="fixed inset-0 pointer-events-none z-30"
+          style={{
+            background: `radial-gradient(ellipse at center, transparent 50%, rgba(224, 108, 96, ${vignetteOpacity}) 100%)`,
+            transition: "background 2s ease",
+          }}
+        />
+      )}
+
       <div className="px-6 pt-6">
         <TimerBar
-          key={currentIndex}
+          key={index}
           durationMs={duration}
           paused={paused}
-          onComplete={advance}
+          onComplete={onComplete}
         />
       </div>
 
-      <div className="flex-1 flex items-center justify-center">
-        <FlashCard
-          summary={currentChunk.summary}
-          files={currentChunk.files}
-          diff={currentChunk.diff}
-          lines={currentChunk.lines}
-          category={currentChunk.category}
-          index={currentIndex}
-          total={chunks.length}
-        />
+      <div
+        className="flex-1 flex items-center justify-center transition-all duration-1000"
+        style={{
+          filter: critical
+            ? "brightness(1.05)"
+            : urgent
+              ? "brightness(1.02)"
+              : "none",
+        }}
+      >
+        <div
+          style={{
+            borderLeft: `1px solid ${borderColor}`,
+            borderRight: `1px solid ${borderColor}`,
+            transition: "border-color 1s ease",
+            padding: "0 2px",
+          }}
+        >
+          <FlashCard
+            summary={chunk.summary}
+            files={chunk.files}
+            diff={chunk.diff}
+            lines={chunk.lines}
+            category={chunk.category}
+            index={index}
+            total={total}
+          />
+        </div>
       </div>
 
       {/* Paused — anomaly detected */}
@@ -635,7 +750,7 @@ export default function App() {
                   }}
                 />
                 <span className="text-xs tracking-[0.2em] text-[var(--lumon-yellow)] uppercase">
-                  Anomaly — Bin {String(currentIndex + 1).padStart(2, "0")}
+                  Anomaly — Bin {String(index + 1).padStart(2, "0")}
                 </span>
               </div>
               <span className="text-[10px] text-[var(--lumon-text-dim)] tracking-wider">
@@ -645,7 +760,7 @@ export default function App() {
             <textarea
               ref={noteRef}
               value={note}
-              onChange={(e) => setNote(e.target.value)}
+              onChange={(e) => onNoteChange(e.target.value)}
               placeholder="Tell us why this code scares you..."
               className="w-full bg-[var(--lumon-bg)] border border-[var(--lumon-border)] px-3 py-2 text-[var(--lumon-white)] text-sm focus:outline-none focus:border-[var(--lumon-yellow)] resize-none"
               rows={3}
@@ -654,16 +769,27 @@ export default function App() {
         </div>
       )}
 
-      {/* Bottom status */}
+      {/* Bottom status — escalates with urgency */}
       <div className="text-center pb-4 flex items-center justify-center gap-6">
         {!paused && (
-          <span className="text-[10px] text-[var(--lumon-text-dim)] tracking-[0.2em] uppercase">
-            Press spacebar if the code scares you
+          <span
+            key={promptMessage}
+            className="text-[10px] tracking-[0.2em] uppercase"
+            style={{
+              color: critical
+                ? "var(--lumon-red)"
+                : urgent
+                  ? "var(--lumon-yellow)"
+                  : "var(--lumon-text-dim)",
+              animation: `bin-reveal 0.3s ease-out${critical ? ", glow-pulse 0.8s ease-in-out infinite" : ""}`,
+            }}
+          >
+            {promptMessage}
           </span>
         )}
-        {flagged.length > 0 && (
+        {flaggedCount > 0 && (
           <span className="text-[10px] text-[var(--lumon-yellow)] tracking-wider opacity-60">
-            {flagged.length} flagged
+            {flaggedCount} flagged
           </span>
         )}
       </div>

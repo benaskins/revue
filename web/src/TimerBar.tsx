@@ -37,17 +37,47 @@ export default function TimerBar({
 
   const progress = Math.min(elapsed / durationMs, 1);
   const remaining = Math.max(0, (1 - progress) * 100);
+  const secondsLeft = Math.ceil((durationMs - elapsed) / 1000);
+  const urgent = progress > 0.7;
+  const critical = progress > 0.9;
+
+  const barColor = critical
+    ? "var(--lumon-red)"
+    : urgent
+      ? "var(--lumon-yellow)"
+      : "var(--lumon-cyan)";
+
+  const glowColor = critical
+    ? "rgba(224, 108, 96, 0.6)"
+    : urgent
+      ? "rgba(212, 170, 92, 0.4)"
+      : "var(--lumon-cyan-glow)";
 
   return (
-    <div className="w-full h-px bg-[var(--lumon-border)] overflow-hidden relative">
-      <div
-        className="h-full transition-none"
+    <div className="flex items-center gap-4">
+      <div className="flex-1 h-px bg-[var(--lumon-border)] overflow-hidden relative">
+        <div
+          className="h-full transition-none"
+          style={{
+            width: `${remaining}%`,
+            background: `linear-gradient(90deg, ${glowColor}, ${barColor})`,
+            boxShadow: `0 0 ${critical ? 12 : urgent ? 8 : 4}px ${glowColor}, 0 0 2px ${barColor}`,
+          }}
+        />
+      </div>
+      <span
+        className="text-xs tabular-nums w-8 text-right tracking-wider"
         style={{
-          width: `${remaining}%`,
-          background: `linear-gradient(90deg, var(--lumon-cyan-glow), var(--lumon-cyan))`,
-          boxShadow: `0 0 8px var(--lumon-cyan-glow), 0 0 2px var(--lumon-cyan)`,
+          color: barColor,
+          animation: critical
+            ? "glow-pulse 0.5s ease-in-out infinite"
+            : urgent
+              ? "glow-pulse 1.5s ease-in-out infinite"
+              : "none",
         }}
-      />
+      >
+        {secondsLeft}
+      </span>
     </div>
   );
 }
