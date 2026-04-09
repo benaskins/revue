@@ -31,6 +31,8 @@ Each chunk should represent a coherent unit of change — for example:
 - A configuration change
 - A bug fix with its guard clause
 
+IMPORTANT: Each chunk's diff MUST be 25 lines or fewer. If a logical change is larger than 25 lines, split it into smaller sub-chunks that each make sense on their own (e.g. split a feature from its tests, or split changes by file).
+
 For each chunk, provide:
 - "summary": a 1-2 sentence description of what this chunk does
 - "files": comma-separated list of files touched by this chunk
