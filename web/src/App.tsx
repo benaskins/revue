@@ -237,6 +237,19 @@ export default function App() {
           className="w-full px-3 py-2 mb-6 bg-neutral-800 border border-neutral-700 rounded text-white placeholder-neutral-500 focus:outline-none focus:border-neutral-500 text-sm"
         />
 
+        <p className="text-xs text-neutral-600 mb-6 leading-relaxed">
+          Your keys stay in your browser (localStorage). This app has no
+          backend — all requests go directly to OpenRouter and GitHub.{" "}
+          <a
+            href="https://github.com/benaskins/revue"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-neutral-500 underline hover:text-neutral-400"
+          >
+            View source
+          </a>
+        </p>
+
         <div className="flex gap-3 justify-end">
           <button
             onClick={() => setShowSettings(false)}
@@ -316,6 +329,21 @@ export default function App() {
             </p>
           )}
           {error && <p className="mt-4 text-red-400 text-sm">{error}</p>}
+
+          <div className="mt-12 text-xs text-neutral-700 leading-relaxed">
+            <p>
+              Runs entirely in your browser. No backend, no tracking, no
+              cookies.{" "}
+              <a
+                href="https://github.com/benaskins/revue"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-neutral-600 underline hover:text-neutral-500"
+              >
+                Source on GitHub
+              </a>
+            </p>
+          </div>
         </div>
       </div>
     );
