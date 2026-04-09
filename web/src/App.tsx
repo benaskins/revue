@@ -19,8 +19,8 @@ export interface FlaggedChunk {
   note: string;
 }
 
-const BASE_MS = 3000;
-const PER_LINE_MS = 80;
+const BASE_MS = 120_000;
+const PER_LINE_MS = 2000;
 
 function chunkDuration(lines: number): number {
   return BASE_MS + lines * PER_LINE_MS;
