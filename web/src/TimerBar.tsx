@@ -36,12 +36,17 @@ export default function TimerBar({
   }, [paused, durationMs, onComplete]);
 
   const progress = Math.min(elapsed / durationMs, 1);
+  const remaining = Math.max(0, (1 - progress) * 100);
 
   return (
-    <div className="w-full h-1 bg-neutral-800 rounded-full overflow-hidden">
+    <div className="w-full h-px bg-[var(--lumon-border)] overflow-hidden relative">
       <div
-        className="h-full bg-white/40 transition-none"
-        style={{ width: `${(1 - progress) * 100}%` }}
+        className="h-full transition-none"
+        style={{
+          width: `${remaining}%`,
+          background: `linear-gradient(90deg, var(--lumon-cyan-glow), var(--lumon-cyan))`,
+          boxShadow: `0 0 8px var(--lumon-cyan-glow), 0 0 2px var(--lumon-cyan)`,
+        }}
       />
     </div>
   );

@@ -37,44 +37,60 @@ function saveSetting(key: string, value: string) {
   }
 }
 
-// Scanning animation for loading phase
-function ScanAnimation() {
+// Lumon-style data refinement animation
+function RefinementAnimation() {
+  const symbols = ["+", "-", "@@", "fn", "{}", "->", "+", "-", "//", "++"];
   return (
     <div className="flex flex-col items-center gap-8">
-      <div className="relative w-64 h-64">
-        <div className="absolute inset-0 border-2 border-neutral-800 rounded-full animate-[spin_8s_linear_infinite]" />
-        <div className="absolute inset-4 border border-neutral-700 rounded-full animate-[spin_6s_linear_infinite_reverse]" />
-        <div className="absolute inset-8 border border-neutral-700/50 rounded-full animate-[spin_4s_linear_infinite]" />
+      <div className="relative w-72 h-72">
+        {/* Outer boundary */}
+        <div
+          className="absolute inset-0 border border-[var(--lumon-border)] rounded-full animate-[spin_12s_linear_infinite]"
+          style={{ boxShadow: "0 0 20px rgba(79, 209, 197, 0.05)" }}
+        />
+        <div className="absolute inset-6 border border-[var(--lumon-border)] rounded-full animate-[spin_8s_linear_infinite_reverse]" />
+        <div className="absolute inset-12 border border-[var(--lumon-cyan-dim)] rounded-full animate-[spin_6s_linear_infinite]" />
+
+        {/* Centre core */}
         <div className="absolute inset-0 flex items-center justify-center">
-          <div className="w-full h-px bg-gradient-to-r from-transparent via-white/30 to-transparent animate-[pulse_2s_ease-in-out_infinite]" />
+          <div
+            className="w-4 h-4 rounded-full"
+            style={{
+              background: "var(--lumon-cyan)",
+              boxShadow:
+                "0 0 12px var(--lumon-cyan-glow), 0 0 30px rgba(79, 209, 197, 0.1)",
+              animation: "glow-pulse 2s ease-in-out infinite",
+            }}
+          />
         </div>
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="w-3 h-3 bg-white/60 rounded-full animate-[pulse_1.5s_ease-in-out_infinite]" />
-        </div>
-        {["+", "-", "@@", "+", "-", "+"].map((sym, i) => (
+
+        {/* Drifting data symbols */}
+        {symbols.map((sym, i) => (
           <div
             key={i}
-            className="absolute text-xs animate-[float_3s_ease-in-out_infinite]"
+            className="absolute text-xs"
             style={{
-              color:
-                sym === "+"
-                  ? "rgb(74 222 128 / 0.4)"
-                  : sym === "-"
-                    ? "rgb(248 113 113 / 0.4)"
-                    : "rgb(148 163 184 / 0.3)",
-              top: `${20 + Math.sin(i * 1.2) * 30}%`,
-              left: `${15 + ((i * 17) % 70)}%`,
-              animationDelay: `${i * 0.5}s`,
+              color: "var(--lumon-text-dim)",
+              top: `${15 + Math.sin(i * 0.9) * 35}%`,
+              left: `${10 + ((i * 13) % 80)}%`,
+              animation: `data-drift ${3 + (i % 3)}s ease-in-out infinite`,
+              animationDelay: `${i * 0.4}s`,
             }}
           >
             {sym}
           </div>
         ))}
       </div>
+
       <div className="text-center">
-        <p className="text-white text-lg font-medium mb-2">Analysing diff</p>
-        <p className="text-neutral-500 text-sm">
-          Grouping changes into reviewable chunks...
+        <p
+          className="text-[var(--lumon-white)] text-sm tracking-[0.2em] uppercase mb-2"
+          style={{ animation: "glow-pulse 3s ease-in-out infinite" }}
+        >
+          Refining Data
+        </p>
+        <p className="text-[var(--lumon-text-dim)] text-xs tracking-wider">
+          Sorting changes into bins...
         </p>
       </div>
     </div>
@@ -92,7 +108,6 @@ export default function App() {
   const [flagged, setFlagged] = useState<FlaggedChunk[]>([]);
   const noteRef = useRef<HTMLTextAreaElement>(null);
 
-  // Settings
   const [apiKey, setApiKey] = useState(() => loadSetting("revue:apiKey", ""));
   const [model, setModel] = useState(() =>
     loadSetting("revue:model", DEFAULT_MODEL),
@@ -110,13 +125,10 @@ export default function App() {
     }
   }, [currentIndex, chunks.length]);
 
-  // Keyboard handler
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      // Don't capture keys when typing in inputs
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") {
-        // Only handle Enter in the note textarea when paused
         if (
           e.code === "Enter" &&
           paused &&
@@ -167,7 +179,7 @@ export default function App() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!apiKey.trim()) {
-      setError("OpenRouter API key required — click the gear icon");
+      setError("Credential required — configure your access key");
       return;
     }
     setError("");
@@ -195,28 +207,41 @@ export default function App() {
     setShowSettings(false);
   }
 
-  // --- Settings panel ---
+  // --- Settings terminal ---
   const settingsPanel = showSettings && (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-      <div className="w-full max-w-md mx-6 bg-neutral-900 border border-neutral-700 rounded-lg p-6">
-        <h2 className="text-lg font-bold text-white mb-4">Settings</h2>
+    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+      <div className="w-full max-w-md mx-6 bg-[var(--lumon-panel)] border border-[var(--lumon-border)] p-6">
+        <div className="flex items-center gap-3 mb-6 pb-3 border-b border-[var(--lumon-border)]">
+          <div
+            className="w-2 h-2 rounded-full"
+            style={{
+              background: "var(--lumon-cyan)",
+              boxShadow: "0 0 6px var(--lumon-cyan-glow)",
+            }}
+          />
+          <h2 className="text-xs tracking-[0.3em] text-[var(--lumon-cyan)] uppercase">
+            Terminal Configuration
+          </h2>
+        </div>
 
-        <label className="block text-sm text-neutral-400 mb-1">
-          OpenRouter API Key
+        <label className="block text-xs text-[var(--lumon-text-dim)] mb-1 tracking-wider uppercase">
+          Access Key
         </label>
         <input
           type="password"
           value={apiKey}
           onChange={(e) => setApiKey(e.target.value)}
           placeholder="sk-or-..."
-          className="w-full px-3 py-2 mb-4 bg-neutral-800 border border-neutral-700 rounded text-white placeholder-neutral-500 focus:outline-none focus:border-neutral-500 text-sm"
+          className="w-full px-3 py-2 mb-4 bg-[var(--lumon-bg)] border border-[var(--lumon-border)] text-[var(--lumon-white)] text-sm focus:outline-none focus:border-[var(--lumon-cyan)]"
         />
 
-        <label className="block text-sm text-neutral-400 mb-1">Model</label>
+        <label className="block text-xs text-[var(--lumon-text-dim)] mb-1 tracking-wider uppercase">
+          Refinement Engine
+        </label>
         <select
           value={model}
           onChange={(e) => setModel(e.target.value)}
-          className="w-full px-3 py-2 mb-4 bg-neutral-800 border border-neutral-700 rounded text-white focus:outline-none focus:border-neutral-500 text-sm"
+          className="w-full px-3 py-2 mb-4 bg-[var(--lumon-bg)] border border-[var(--lumon-border)] text-[var(--lumon-white)] text-sm focus:outline-none focus:border-[var(--lumon-cyan)]"
         >
           {MODELS.map((m) => (
             <option key={m.id} value={m.id}>
@@ -225,66 +250,69 @@ export default function App() {
           ))}
         </select>
 
-        <label className="block text-sm text-neutral-400 mb-1">
-          GitHub Token{" "}
-          <span className="text-neutral-600">(optional, for private repos)</span>
+        <label className="block text-xs text-[var(--lumon-text-dim)] mb-1 tracking-wider uppercase">
+          Repository Credential{" "}
+          <span className="normal-case tracking-normal opacity-50">
+            (optional)
+          </span>
         </label>
         <input
           type="password"
           value={githubToken}
           onChange={(e) => setGithubToken(e.target.value)}
           placeholder="ghp_..."
-          className="w-full px-3 py-2 mb-6 bg-neutral-800 border border-neutral-700 rounded text-white placeholder-neutral-500 focus:outline-none focus:border-neutral-500 text-sm"
+          className="w-full px-3 py-2 mb-6 bg-[var(--lumon-bg)] border border-[var(--lumon-border)] text-[var(--lumon-white)] text-sm focus:outline-none focus:border-[var(--lumon-cyan)]"
         />
 
-        <p className="text-xs text-neutral-600 mb-6 leading-relaxed">
-          Your keys stay in your browser (localStorage). This app has no
-          backend — all requests go directly to OpenRouter and GitHub.{" "}
+        <p className="text-xs text-[var(--lumon-text-dim)] mb-6 leading-relaxed opacity-60">
+          All credentials remain in local storage. No data leaves this
+          terminal except to OpenRouter and GitHub.{" "}
           <a
             href="https://github.com/benaskins/revue"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-neutral-500 underline hover:text-neutral-400"
+            className="text-[var(--lumon-text)] underline hover:text-[var(--lumon-cyan)]"
           >
-            View source
+            Inspect source
           </a>
         </p>
 
         <div className="flex gap-3 justify-end">
           <button
             onClick={() => setShowSettings(false)}
-            className="px-4 py-2 text-sm text-neutral-400 border border-neutral-700 rounded hover:border-neutral-500 transition-colors"
+            className="px-4 py-2 text-xs tracking-wider text-[var(--lumon-text-dim)] border border-[var(--lumon-border)] hover:border-[var(--lumon-text-dim)] transition-colors uppercase"
           >
-            Cancel
+            Dismiss
           </button>
           <button
             onClick={handleSaveSettings}
-            className="px-4 py-2 text-sm text-black bg-white rounded hover:bg-neutral-200 transition-colors"
+            className="px-4 py-2 text-xs tracking-wider text-[var(--lumon-bg)] bg-[var(--lumon-cyan)] hover:brightness-110 transition-all uppercase"
           >
-            Save
+            Confirm
           </button>
         </div>
       </div>
     </div>
   );
 
-  // --- Settings gear (always visible on input phase) ---
   const settingsButton = (
     <button
       onClick={() => setShowSettings(true)}
-      className="fixed top-4 right-4 p-2 text-neutral-600 hover:text-neutral-400 transition-colors z-40"
-      title="Settings"
+      className="fixed top-4 right-4 p-2 text-[var(--lumon-text-dim)] hover:text-[var(--lumon-cyan)] transition-colors z-40"
+      title="Terminal Configuration"
     >
       <svg
-        width="20"
-        height="20"
-        viewBox="0 0 20 20"
+        width="16"
+        height="16"
+        viewBox="0 0 16 16"
         fill="none"
         stroke="currentColor"
-        strokeWidth="1.5"
+        strokeWidth="1"
       >
-        <path d="M10 13a3 3 0 100-6 3 3 0 000 6z" />
-        <path d="M16.4 12.4a1.2 1.2 0 00.24 1.32l.04.04a1.44 1.44 0 11-2.04 2.04l-.04-.04a1.2 1.2 0 00-1.32-.24 1.2 1.2 0 00-.72 1.08v.12a1.44 1.44 0 11-2.88 0v-.06a1.2 1.2 0 00-.78-1.08 1.2 1.2 0 00-1.32.24l-.04.04a1.44 1.44 0 11-2.04-2.04l.04-.04a1.2 1.2 0 00.24-1.32 1.2 1.2 0 00-1.08-.72h-.12a1.44 1.44 0 110-2.88h.06a1.2 1.2 0 001.08-.78 1.2 1.2 0 00-.24-1.32l-.04-.04a1.44 1.44 0 112.04-2.04l.04.04a1.2 1.2 0 001.32.24h.06a1.2 1.2 0 00.72-1.08v-.12a1.44 1.44 0 112.88 0v.06a1.2 1.2 0 00.78 1.08 1.2 1.2 0 001.32-.24l.04-.04a1.44 1.44 0 112.04 2.04l-.04.04a1.2 1.2 0 00-.24 1.32v.06a1.2 1.2 0 001.08.72h.12a1.44 1.44 0 110 2.88h-.06a1.2 1.2 0 00-1.08.78z" />
+        <rect x="1" y="1" width="14" height="14" rx="1" />
+        <line x1="1" y1="5" x2="15" y2="5" />
+        <circle cx="4" cy="3" r="0.5" fill="currentColor" />
+        <circle cx="6.5" cy="3" r="0.5" fill="currentColor" />
       </svg>
     </button>
   );
@@ -295,52 +323,66 @@ export default function App() {
       <div className="min-h-screen flex items-center justify-center">
         {settingsButton}
         {settingsPanel}
-        <div className="w-full max-w-lg px-6">
-          <h1 className="text-4xl font-bold mb-2 text-white tracking-tight">
-            revue
-          </h1>
-          <p className="text-neutral-400 mb-8">
-            Flash-card PR review. Paste a PR URL to begin.
-          </p>
+        <div className="w-full max-w-lg px-6 text-center">
+          <div className="mb-8">
+            <h1
+              className="text-3xl font-light tracking-[0.4em] text-[var(--lumon-white)] uppercase mb-3"
+              style={{ animation: "glow-pulse 4s ease-in-out infinite" }}
+            >
+              Revue
+            </h1>
+            <div className="w-16 h-px bg-[var(--lumon-border)] mx-auto mb-3" />
+            <p className="text-xs tracking-[0.2em] text-[var(--lumon-text-dim)] uppercase">
+              Code Refinement Terminal
+            </p>
+          </div>
+
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <input
               type="url"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://github.com/owner/repo/pull/123"
+              placeholder="Enter pull request location"
               required
-              className="w-full px-4 py-3 bg-neutral-900 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:border-neutral-500"
+              className="w-full px-4 py-3 bg-[var(--lumon-panel)] border border-[var(--lumon-border)] text-[var(--lumon-white)] text-sm text-center tracking-wide focus:outline-none focus:border-[var(--lumon-cyan)] transition-colors"
             />
             <button
               type="submit"
-              className="px-6 py-3 bg-white text-black font-medium rounded-lg hover:bg-neutral-200 transition-colors"
+              className="px-6 py-3 text-xs tracking-[0.3em] uppercase text-[var(--lumon-bg)] bg-[var(--lumon-cyan)] hover:brightness-110 transition-all"
+              style={{
+                boxShadow: "0 0 15px rgba(79, 209, 197, 0.15)",
+              }}
             >
-              Start Review
+              Begin Refinement
             </button>
           </form>
+
           {!apiKey && (
-            <p className="mt-4 text-neutral-600 text-sm">
-              Set your OpenRouter API key in settings to get started
+            <p className="mt-6 text-[var(--lumon-text-dim)] text-xs tracking-wider">
+              Configure your access key to proceed
             </p>
           )}
           {apiKey && (
-            <p className="mt-4 text-neutral-700 text-xs">
-              Using {MODELS.find((m) => m.id === model)?.name || model}
+            <p className="mt-6 text-[var(--lumon-text-dim)] text-xs tracking-wider opacity-50">
+              Engine: {MODELS.find((m) => m.id === model)?.name || model}
             </p>
           )}
-          {error && <p className="mt-4 text-red-400 text-sm">{error}</p>}
+          {error && (
+            <p className="mt-4 text-[var(--lumon-red)] text-xs tracking-wider">
+              {error}
+            </p>
+          )}
 
-          <div className="mt-12 text-xs text-neutral-700 leading-relaxed">
+          <div className="mt-16 text-[10px] text-[var(--lumon-text-dim)] opacity-40 tracking-wider leading-relaxed">
             <p>
-              Runs entirely in your browser. No backend, no tracking, no
-              cookies.{" "}
+              This terminal operates entirely within your browser.{" "}
               <a
                 href="https://github.com/benaskins/revue"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-neutral-600 underline hover:text-neutral-500"
+                className="underline hover:text-[var(--lumon-text)]"
               >
-                Source on GitHub
+                Inspect source
               </a>
             </p>
           </div>
@@ -353,7 +395,7 @@ export default function App() {
   if (phase === "loading") {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <ScanAnimation />
+        <RefinementAnimation />
       </div>
     );
   }
@@ -363,18 +405,30 @@ export default function App() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <div className="text-6xl font-bold text-white mb-4">
+          <p className="text-[var(--lumon-text-dim)] text-xs tracking-[0.3em] uppercase mb-6">
+            Refinement Complete
+          </p>
+          <div
+            className="text-7xl font-light text-[var(--lumon-cyan)] mb-4"
+            style={{
+              animation: "glow-pulse 3s ease-in-out infinite",
+              textShadow:
+                "0 0 20px var(--lumon-cyan-glow), 0 0 40px rgba(79, 209, 197, 0.1)",
+            }}
+          >
             {chunks.length}
           </div>
-          <p className="text-neutral-400 text-lg mb-2">
-            chunks ready for review
+          <p className="text-[var(--lumon-text)] text-sm tracking-wider mb-2">
+            bins ready for review
           </p>
-          <p className="text-neutral-600 text-sm mb-8">
-            ~{Math.ceil((chunks.length * BASE_MS) / 60_000)} min at 1 min per
-            card
+          <p className="text-[var(--lumon-text-dim)] text-xs tracking-wider mb-10">
+            estimated duration:{" "}
+            {Math.ceil((chunks.length * BASE_MS) / 60_000)} min
           </p>
           <div className="animate-pulse">
-            <p className="text-white text-sm">Press spacebar to begin</p>
+            <p className="text-[var(--lumon-cyan)] text-xs tracking-[0.2em] uppercase">
+              Press spacebar to begin session
+            </p>
           </div>
         </div>
       </div>
@@ -386,36 +440,64 @@ export default function App() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="w-full max-w-2xl px-6">
-          <h1 className="text-3xl font-bold mb-2 text-white">
-            Review Complete
-          </h1>
-          <p className="text-neutral-400 mb-6">
-            {flagged.length} of {chunks.length} chunks flagged
-          </p>
+          <div className="text-center mb-8">
+            <p className="text-[var(--lumon-text-dim)] text-xs tracking-[0.3em] uppercase mb-3">
+              Session Complete
+            </p>
+            <div className="flex items-center justify-center gap-6">
+              <div>
+                <div className="text-3xl text-[var(--lumon-cyan)]">
+                  {flagged.length}
+                </div>
+                <div className="text-[10px] text-[var(--lumon-text-dim)] tracking-wider uppercase">
+                  Flagged
+                </div>
+              </div>
+              <div className="w-px h-8 bg-[var(--lumon-border)]" />
+              <div>
+                <div className="text-3xl text-[var(--lumon-text)]">
+                  {chunks.length}
+                </div>
+                <div className="text-[10px] text-[var(--lumon-text-dim)] tracking-wider uppercase">
+                  Total
+                </div>
+              </div>
+            </div>
+          </div>
 
           {flagged.length === 0 ? (
-            <p className="text-neutral-500">No chunks flagged. Clean PR!</p>
+            <p className="text-[var(--lumon-text-dim)] text-center text-sm">
+              No anomalies detected. All bins refined.
+            </p>
           ) : (
-            <div className="space-y-4 text-left">
+            <div className="space-y-3 text-left">
               {flagged.map((f, i) => (
                 <div
                   key={i}
-                  className="bg-neutral-900 border border-neutral-800 rounded-lg p-4"
+                  className="bg-[var(--lumon-panel)] border border-[var(--lumon-border)] p-4"
                 >
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-xs text-neutral-500">
-                      Chunk {f.index + 1}
+                  <div className="flex items-center gap-3 mb-2">
+                    <span className="text-[10px] text-[var(--lumon-text-dim)] tracking-[0.2em] uppercase">
+                      Bin {String(f.index + 1).padStart(2, "0")}
                     </span>
-                    <span className="text-xs text-yellow-400/70">
+                    <span className="text-[10px] text-[var(--lumon-yellow)] tracking-wider uppercase">
                       {f.chunk.category}
                     </span>
                   </div>
-                  <p className="text-white text-sm mb-1">{f.chunk.summary}</p>
-                  <p className="text-neutral-500 text-xs mb-2">
+                  <p className="text-[var(--lumon-white)] text-sm mb-1">
+                    {f.chunk.summary}
+                  </p>
+                  <p className="text-[var(--lumon-text-dim)] text-xs mb-2">
                     {f.chunk.files}
                   </p>
-                  <div className="bg-neutral-800 rounded px-3 py-2">
-                    <p className="text-yellow-300 text-sm whitespace-pre-wrap">
+                  <div
+                    className="border-l-2 border-[var(--lumon-yellow)] pl-3 mt-2"
+                    style={{
+                      background:
+                        "linear-gradient(90deg, rgba(212, 170, 92, 0.05), transparent)",
+                    }}
+                  >
+                    <p className="text-[var(--lumon-yellow)] text-sm whitespace-pre-wrap">
                       {f.note}
                     </p>
                   </div>
@@ -424,21 +506,21 @@ export default function App() {
             </div>
           )}
 
-          <div className="flex gap-3 mt-6">
+          <div className="flex gap-3 mt-8 justify-center">
             {flagged.length > 0 && (
               <button
                 onClick={() => {
                   const text = flagged
                     .map(
                       (f) =>
-                        `## Chunk ${f.index + 1}: ${f.chunk.summary}\n**Files:** ${f.chunk.files}\n**Category:** ${f.chunk.category}\n\n> ${f.note}\n`,
+                        `## Bin ${String(f.index + 1).padStart(2, "0")}: ${f.chunk.summary}\n**Files:** ${f.chunk.files}\n**Category:** ${f.chunk.category}\n\n> ${f.note}\n`,
                     )
                     .join("\n---\n\n");
                   navigator.clipboard.writeText(text);
                 }}
-                className="px-4 py-2 text-sm text-white bg-neutral-800 border border-neutral-700 rounded hover:border-neutral-500 transition-colors"
+                className="px-4 py-2 text-xs tracking-wider text-[var(--lumon-cyan)] border border-[var(--lumon-border)] hover:border-[var(--lumon-cyan)] transition-colors uppercase"
               >
-                Copy to Clipboard
+                Export Report
               </button>
             )}
             <button
@@ -447,9 +529,9 @@ export default function App() {
                 setChunks([]);
                 setFlagged([]);
               }}
-              className="px-4 py-2 text-sm text-neutral-400 border border-neutral-700 rounded hover:border-neutral-500 transition-colors"
+              className="px-4 py-2 text-xs tracking-wider text-[var(--lumon-text-dim)] border border-[var(--lumon-border)] hover:border-[var(--lumon-text-dim)] transition-colors uppercase"
             >
-              New Review
+              New Session
             </button>
           </div>
         </div>
@@ -468,7 +550,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <div className="px-6 pt-4">
+      <div className="px-6 pt-6">
         <TimerBar
           key={currentIndex}
           durationMs={duration}
@@ -489,37 +571,48 @@ export default function App() {
         />
       </div>
 
+      {/* Paused — anomaly detected */}
       {paused && (
-        <div className="fixed inset-0 bg-black/60 flex items-end justify-center pb-8 z-50">
-          <div className="w-full max-w-2xl mx-6 bg-neutral-900 border border-neutral-700 rounded-lg p-4">
+        <div className="fixed inset-0 bg-black/70 flex items-end justify-center pb-8 z-50">
+          <div className="w-full max-w-2xl mx-6 bg-[var(--lumon-panel)] border border-[var(--lumon-yellow)] p-4">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-sm text-yellow-400 font-medium">
-                Paused — reviewing chunk {currentIndex + 1}
-              </span>
-              <span className="text-xs text-neutral-500">
-                Enter to flag · Esc to skip
+              <div className="flex items-center gap-2">
+                <div
+                  className="w-2 h-2 rounded-full animate-pulse"
+                  style={{
+                    background: "var(--lumon-yellow)",
+                    boxShadow: "0 0 8px rgba(212, 170, 92, 0.4)",
+                  }}
+                />
+                <span className="text-xs tracking-[0.2em] text-[var(--lumon-yellow)] uppercase">
+                  Anomaly — Bin {String(currentIndex + 1).padStart(2, "0")}
+                </span>
+              </div>
+              <span className="text-[10px] text-[var(--lumon-text-dim)] tracking-wider">
+                ENTER to flag · ESC to dismiss
               </span>
             </div>
             <textarea
               ref={noteRef}
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="What caught your eye? (Enter to flag, Esc to skip)"
-              className="w-full bg-neutral-800 border border-neutral-700 rounded px-3 py-2 text-white placeholder-neutral-500 focus:outline-none focus:border-neutral-500 resize-none"
+              placeholder="Tell us why this code scares you..."
+              className="w-full bg-[var(--lumon-bg)] border border-[var(--lumon-border)] px-3 py-2 text-[var(--lumon-white)] text-sm focus:outline-none focus:border-[var(--lumon-yellow)] resize-none"
               rows={3}
             />
           </div>
         </div>
       )}
 
-      <div className="text-center pb-4 flex items-center justify-center gap-4">
+      {/* Bottom status */}
+      <div className="text-center pb-4 flex items-center justify-center gap-6">
         {!paused && (
-          <span className="text-xs text-neutral-600">
-            spacebar to pause and examine
+          <span className="text-[10px] text-[var(--lumon-text-dim)] tracking-[0.2em] uppercase">
+            Press spacebar if the code scares you
           </span>
         )}
         {flagged.length > 0 && (
-          <span className="text-xs text-yellow-400/60">
+          <span className="text-[10px] text-[var(--lumon-yellow)] tracking-wider opacity-60">
             {flagged.length} flagged
           </span>
         )}

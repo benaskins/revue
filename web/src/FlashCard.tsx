@@ -8,30 +8,40 @@ interface FlashCardProps {
   total: number;
 }
 
-const categoryColors: Record<string, string> = {
-  feature: "text-green-400 bg-green-400/10 border-green-400/30",
-  fix: "text-red-400 bg-red-400/10 border-red-400/30",
-  refactor: "text-blue-400 bg-blue-400/10 border-blue-400/30",
-  test: "text-yellow-400 bg-yellow-400/10 border-yellow-400/30",
-  config: "text-purple-400 bg-purple-400/10 border-purple-400/30",
-  docs: "text-cyan-400 bg-cyan-400/10 border-cyan-400/30",
-  chore: "text-neutral-400 bg-neutral-400/10 border-neutral-400/30",
+const categoryLabels: Record<string, string> = {
+  feature: "ADDITION",
+  fix: "CORRECTION",
+  refactor: "REORGANISATION",
+  test: "VERIFICATION",
+  config: "CONFIGURATION",
+  docs: "DOCUMENTATION",
+  chore: "MAINTENANCE",
 };
 
 function DiffLine({ line }: { line: string }) {
   if (line.startsWith("+")) {
-    return <div className="text-green-400 bg-green-400/5">{line}</div>;
+    return (
+      <div className="text-[var(--lumon-green)] bg-[rgba(95,186,125,0.05)]">
+        {line}
+      </div>
+    );
   }
   if (line.startsWith("-")) {
-    return <div className="text-red-400 bg-red-400/5">{line}</div>;
+    return (
+      <div className="text-[var(--lumon-red)] bg-[rgba(224,108,96,0.05)]">
+        {line}
+      </div>
+    );
   }
   if (line.startsWith("@@")) {
-    return <div className="text-cyan-400/60">{line}</div>;
+    return <div className="text-[var(--lumon-text-dim)]">{line}</div>;
   }
   if (line.startsWith("diff --git")) {
-    return <div className="text-neutral-500 font-bold mt-2">{line}</div>;
+    return (
+      <div className="text-[var(--lumon-cyan)] opacity-50 mt-2">{line}</div>
+    );
   }
-  return <div className="text-neutral-400">{line}</div>;
+  return <div className="text-[var(--lumon-text)]">{line}</div>;
 }
 
 export default function FlashCard({
@@ -43,34 +53,42 @@ export default function FlashCard({
   index,
   total,
 }: FlashCardProps) {
-  const colorClass =
-    categoryColors[category] ||
-    "text-neutral-400 bg-neutral-400/10 border-neutral-400/30";
+  const label = categoryLabels[category] || category.toUpperCase();
   const diffLines = diff.split("\n");
 
   return (
-    <div className="w-full max-w-4xl mx-auto px-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <span className="text-neutral-500 text-sm">
-          {index + 1} / {total}
-        </span>
-        <div className="flex items-center gap-3">
-          <span
-            className={`text-xs px-2 py-1 rounded border ${colorClass}`}
-          >
-            {category}
+    <div
+      className="w-full max-w-4xl mx-auto px-6"
+      style={{ animation: "bin-reveal 0.3s ease-out" }}
+    >
+      {/* Lumon-style header bar */}
+      <div className="flex items-center justify-between mb-6 pb-3 border-b border-[var(--lumon-border)]">
+        <div className="flex items-center gap-4">
+          <span className="text-[var(--lumon-cyan)] text-xs tracking-[0.3em] uppercase">
+            Bin {String(index + 1).padStart(2, "0")}/{String(total).padStart(2, "0")}
           </span>
-          <span className="text-neutral-500 text-xs">{lines} lines</span>
+          <span className="text-[var(--lumon-text-dim)] text-xs">
+            {lines} units
+          </span>
         </div>
+        <span className="text-xs tracking-[0.2em] text-[var(--lumon-text-dim)] uppercase border border-[var(--lumon-border)] px-3 py-1">
+          {label}
+        </span>
       </div>
 
-      {/* Summary */}
-      <h2 className="text-xl text-white font-medium mb-2">{summary}</h2>
-      <p className="text-neutral-500 text-sm mb-6">{files}</p>
+      {/* Summary — the "data" you're refining */}
+      <h2
+        className="text-lg text-[var(--lumon-white)] font-normal mb-1 leading-relaxed"
+        style={{ animation: "glow-pulse 4s ease-in-out infinite" }}
+      >
+        {summary}
+      </h2>
+      <p className="text-[var(--lumon-text-dim)] text-xs tracking-wider mb-6">
+        {files}
+      </p>
 
-      {/* Diff */}
-      <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-4 overflow-auto max-h-[60vh]">
+      {/* Diff bin */}
+      <div className="bg-[var(--lumon-panel)] border border-[var(--lumon-border)] p-4 overflow-auto max-h-[55vh]">
         <pre className="text-sm leading-relaxed">
           {diffLines.map((line, i) => (
             <DiffLine key={i} line={line} />

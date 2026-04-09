@@ -1,13 +1,104 @@
 @import "tailwindcss";
 
+:root {
+  --lumon-bg: #0a0d0f;
+  --lumon-panel: #0d1117;
+  --lumon-border: #1a2332;
+  --lumon-cyan: #4fd1c5;
+  --lumon-cyan-dim: rgba(79, 209, 197, 0.15);
+  --lumon-cyan-glow: rgba(79, 209, 197, 0.4);
+  --lumon-text: rgba(79, 209, 197, 0.7);
+  --lumon-text-dim: rgba(79, 209, 197, 0.3);
+  --lumon-white: rgba(200, 230, 225, 0.9);
+  --lumon-red: #e06c60;
+  --lumon-green: #5fba7d;
+  --lumon-yellow: #d4aa5c;
+}
+
 body {
   margin: 0;
-  background: #0a0a0a;
-  color: #e5e5e5;
-  font-family: ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, monospace;
+  background: var(--lumon-bg);
+  color: var(--lumon-text);
+  font-family: "SF Mono", ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, monospace;
+}
+
+/* CRT scanline overlay */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.08) 2px,
+    rgba(0, 0, 0, 0.08) 4px
+  );
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* Subtle screen flicker */
+@keyframes flicker {
+  0%, 100% { opacity: 1; }
+  92% { opacity: 1; }
+  93% { opacity: 0.96; }
+  94% { opacity: 1; }
+}
+
+#root {
+  animation: flicker 8s infinite;
 }
 
 @keyframes float {
   0%, 100% { transform: translateY(0); opacity: 0.3; }
   50% { transform: translateY(-12px); opacity: 0.6; }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { text-shadow: 0 0 4px var(--lumon-cyan-glow); }
+  50% { text-shadow: 0 0 12px var(--lumon-cyan-glow), 0 0 24px rgba(79, 209, 197, 0.15); }
+}
+
+@keyframes data-drift {
+  0% { transform: translateY(0) scale(1); opacity: 0; }
+  10% { opacity: 0.6; }
+  90% { opacity: 0.6; }
+  100% { transform: translateY(-60px) scale(0.8); opacity: 0; }
+}
+
+@keyframes bin-reveal {
+  0% { opacity: 0; transform: scale(0.95); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* Lumon input styling */
+input[type="url"],
+input[type="password"],
+textarea,
+select {
+  caret-color: var(--lumon-cyan);
+}
+
+input[type="url"]::placeholder,
+input[type="password"]::placeholder,
+textarea::placeholder {
+  color: var(--lumon-text-dim);
+}
+
+::selection {
+  background: var(--lumon-cyan-dim);
+  color: var(--lumon-white);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: var(--lumon-bg);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--lumon-border);
+  border-radius: 2px;
 }
