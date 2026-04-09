@@ -17,6 +17,7 @@ func main() {
 
 	srv := revue.NewServer(
 		revue.WithStaticFiles(&revue.StaticFiles),
+		revue.WithGitHubToken(os.Getenv("GITHUB_TOKEN")),
 	)
 
 	mux := http.NewServeMux()
