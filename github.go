@@ -65,6 +65,21 @@ func (c *GitHubClient) FetchDiff(ctx context.Context, ref PRRef) (string, error)
 	}
 	defer resp.Body.Close()
 
+	// Retry without auth on 401 — token may be expired but repo may be public
+	if resp.StatusCode == http.StatusUnauthorized && c.token != "" {
+		resp.Body.Close()
+		req, err = http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+		if err != nil {
+			return "", err
+		}
+		req.Header.Set("Accept", "application/vnd.github.v3.diff")
+		resp, err = c.httpClient.Do(req)
+		if err != nil {
+			return "", err
+		}
+		defer resp.Body.Close()
+	}
+
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
 		return "", fmt.Errorf("GitHub API returned %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
