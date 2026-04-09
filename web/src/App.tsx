@@ -154,17 +154,64 @@ export default function App() {
           <p className="text-neutral-400 mb-6">
             {flagged.length} of {chunks.length} chunks flagged
           </p>
-          {/* Summary list built in step 7 */}
-          <button
-            onClick={() => {
-              setPhase("input");
-              setChunks([]);
-              setFlagged([]);
-            }}
-            className="mt-4 px-4 py-2 text-sm text-neutral-400 border border-neutral-700 rounded hover:border-neutral-500 transition-colors"
-          >
-            New Review
-          </button>
+
+          {flagged.length === 0 ? (
+            <p className="text-neutral-500">No chunks flagged. Clean PR!</p>
+          ) : (
+            <div className="space-y-4 text-left">
+              {flagged.map((f, i) => (
+                <div
+                  key={i}
+                  className="bg-neutral-900 border border-neutral-800 rounded-lg p-4"
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-xs text-neutral-500">
+                      Chunk {f.index + 1}
+                    </span>
+                    <span className="text-xs text-yellow-400/70">
+                      {f.chunk.category}
+                    </span>
+                  </div>
+                  <p className="text-white text-sm mb-1">{f.chunk.summary}</p>
+                  <p className="text-neutral-500 text-xs mb-2">{f.chunk.files}</p>
+                  <div className="bg-neutral-800 rounded px-3 py-2">
+                    <p className="text-yellow-300 text-sm whitespace-pre-wrap">
+                      {f.note}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="flex gap-3 mt-6">
+            {flagged.length > 0 && (
+              <button
+                onClick={() => {
+                  const text = flagged
+                    .map(
+                      (f) =>
+                        `## Chunk ${f.index + 1}: ${f.chunk.summary}\n**Files:** ${f.chunk.files}\n**Category:** ${f.chunk.category}\n\n> ${f.note}\n`,
+                    )
+                    .join("\n---\n\n");
+                  navigator.clipboard.writeText(text);
+                }}
+                className="px-4 py-2 text-sm text-white bg-neutral-800 border border-neutral-700 rounded hover:border-neutral-500 transition-colors"
+              >
+                Copy to Clipboard
+              </button>
+            )}
+            <button
+              onClick={() => {
+                setPhase("input");
+                setChunks([]);
+                setFlagged([]);
+              }}
+              className="px-4 py-2 text-sm text-neutral-400 border border-neutral-700 rounded hover:border-neutral-500 transition-colors"
+            >
+              New Review
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -228,14 +275,19 @@ export default function App() {
         </div>
       )}
 
-      {/* Bottom hint */}
-      {!paused && (
-        <div className="text-center pb-4">
+      {/* Bottom bar */}
+      <div className="text-center pb-4 flex items-center justify-center gap-4">
+        {!paused && (
           <span className="text-xs text-neutral-600">
             spacebar to pause and examine
           </span>
-        </div>
-      )}
+        )}
+        {flagged.length > 0 && (
+          <span className="text-xs text-yellow-400/60">
+            {flagged.length} flagged
+          </span>
+        )}
+      </div>
     </div>
   );
 }
