@@ -11,9 +11,9 @@ import (
 )
 
 func main() {
-	addr := os.Getenv("ADDR")
-	if addr == "" {
-		addr = ":8090"
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8090"
 	}
 
 	model := os.Getenv("REVUE_MODEL")
@@ -36,6 +36,6 @@ func main() {
 	mux.Handle("/api/", srv.Handler())
 	mux.Handle("/", srv.SPAHandler())
 
-	slog.Info("starting revue", "addr", addr)
-	axon.ListenAndServe(addr, mux)
+	slog.Info("starting revue", "port", port)
+	axon.ListenAndServe(port, mux)
 }
