@@ -37,8 +37,31 @@ function saveSetting(key: string, value: string) {
   }
 }
 
+const REASSURANCES = [
+  "Please be patient",
+  "Don't be afraid",
+  "Not all code is scary",
+  "Trust your feelings",
+  "You are doing important work",
+  "The data wants to be sorted",
+  "Your outie appreciates this",
+  "Stay calm and refine",
+];
+
+function useRotatingMessage(messages: string[], intervalMs: number): string {
+  const [index, setIndex] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setIndex((i) => (i + 1) % messages.length);
+    }, intervalMs);
+    return () => clearInterval(timer);
+  }, [messages, intervalMs]);
+  return messages[index];
+}
+
 // Lumon-style data refinement animation
 function RefinementAnimation() {
+  const message = useRotatingMessage(REASSURANCES, 2500);
   const symbols = ["+", "-", "@@", "fn", "{}", "->", "+", "-", "//", "++"];
   return (
     <div className="flex flex-col items-center gap-8">
@@ -84,13 +107,17 @@ function RefinementAnimation() {
 
       <div className="text-center">
         <p
-          className="text-[var(--lumon-white)] text-sm tracking-[0.2em] uppercase mb-2"
+          className="text-[var(--lumon-white)] text-sm tracking-[0.2em] uppercase mb-3"
           style={{ animation: "glow-pulse 3s ease-in-out infinite" }}
         >
           Refining Data
         </p>
-        <p className="text-[var(--lumon-text-dim)] text-xs tracking-wider">
-          Sorting changes into bins...
+        <p
+          key={message}
+          className="text-[var(--lumon-text-dim)] text-xs tracking-wider h-4"
+          style={{ animation: "bin-reveal 0.4s ease-out" }}
+        >
+          {message}
         </p>
       </div>
     </div>
