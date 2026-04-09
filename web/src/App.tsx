@@ -224,8 +224,31 @@ export default function App() {
           </h2>
         </div>
 
+        <p className="text-xs text-[var(--lumon-text-dim)] mb-5 leading-relaxed opacity-70">
+          This terminal uses{" "}
+          <a
+            href="https://openrouter.ai"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[var(--lumon-cyan)] hover:underline"
+          >
+            OpenRouter
+          </a>{" "}
+          to access LLM providers. You'll need an OpenRouter API key — create
+          one at{" "}
+          <a
+            href="https://openrouter.ai/keys"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[var(--lumon-cyan)] hover:underline"
+          >
+            openrouter.ai/keys
+          </a>
+          .
+        </p>
+
         <label className="block text-xs text-[var(--lumon-text-dim)] mb-1 tracking-wider uppercase">
-          Access Key
+          OpenRouter API Key
         </label>
         <input
           type="password"
