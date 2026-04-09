@@ -1,4 +1,5 @@
 import { useState } from "react";
+import FlashCard from "./FlashCard";
 import "./index.css";
 
 interface Chunk {
@@ -85,34 +86,27 @@ export default function App() {
     );
   }
 
-  // Review and summary phases will be built in steps 5-7
+  // Review phase: show current chunk as a flash card
+  const currentChunk = chunks[0]; // Step 6 will add index tracking + timer
+  if (!currentChunk) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-neutral-400">No chunks to review.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center">
-      <div className="text-center">
-        <p className="text-neutral-400">
-          {chunks.length} chunks loaded. Review UI coming next.
-        </p>
-        <pre className="mt-4 text-left text-xs text-neutral-500 max-w-2xl overflow-auto">
-          {JSON.stringify(
-            chunks.map((c) => ({
-              summary: c.summary,
-              category: c.category,
-              lines: c.lines,
-            })),
-            null,
-            2,
-          )}
-        </pre>
-        <button
-          onClick={() => {
-            setPhase("input");
-            setChunks([]);
-          }}
-          className="mt-6 px-4 py-2 text-sm text-neutral-400 border border-neutral-700 rounded hover:border-neutral-500 transition-colors"
-        >
-          Back
-        </button>
-      </div>
+      <FlashCard
+        summary={currentChunk.summary}
+        files={currentChunk.files}
+        diff={currentChunk.diff}
+        lines={currentChunk.lines}
+        category={currentChunk.category}
+        index={0}
+        total={chunks.length}
+      />
     </div>
   );
 }
