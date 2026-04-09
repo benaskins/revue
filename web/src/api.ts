@@ -138,9 +138,15 @@ export async function chunkDiff(
   }
 
   const data = await res.json();
-  const content = data.choices?.[0]?.message?.content;
+  let content = data.choices?.[0]?.message?.content;
   if (!content) {
     throw new Error("No response from model");
+  }
+
+  // Strip markdown code fences if present
+  content = content.trim();
+  if (content.startsWith("```")) {
+    content = content.replace(/^```(?:json)?\s*\n?/, "").replace(/\n?```\s*$/, "");
   }
 
   return JSON.parse(content) as ChunkResult;
