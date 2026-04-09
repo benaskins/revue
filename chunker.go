@@ -83,16 +83,31 @@ func (c *Chunker) Chunk(ctx context.Context, diff string) (*ChunkResult, error) 
 	}, talk.WithStructuredOutput(chunkSchema))
 
 	var buf strings.Builder
+	var toolArgs map[string]any
 	err := c.client.Chat(ctx, req, func(resp talk.Response) error {
 		buf.WriteString(resp.Content)
+		// Anthropic returns structured output as a tool call
+		for _, tc := range resp.ToolCalls {
+			if tc.Name == "structured_response" {
+				toolArgs = tc.Arguments
+			}
+		}
 		return nil
 	})
 	if err != nil {
 		return nil, fmt.Errorf("LLM chunking failed: %w", err)
 	}
 
+	// Prefer tool call arguments (Anthropic), fall back to text content (OpenAI)
+	var raw []byte
+	if toolArgs != nil {
+		raw, _ = json.Marshal(toolArgs)
+	} else {
+		raw = []byte(buf.String())
+	}
+
 	var result ChunkResult
-	if err := json.Unmarshal([]byte(buf.String()), &result); err != nil {
+	if err := json.Unmarshal(raw, &result); err != nil {
 		return nil, fmt.Errorf("failed to parse chunk response: %w", err)
 	}
 	return &result, nil

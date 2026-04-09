@@ -51,6 +51,44 @@ func TestChunkerReturnsChunks(t *testing.T) {
 	}
 }
 
+type mockToolCallLLM struct {
+	args map[string]any
+}
+
+func (m *mockToolCallLLM) Chat(_ context.Context, _ *talk.Request, fn func(talk.Response) error) error {
+	return fn(talk.Response{
+		ToolCalls: []talk.ToolCall{{Name: "structured_response", Arguments: m.args}},
+		Done:      true,
+	})
+}
+
+func TestChunkerReturnsChunksFromToolCall(t *testing.T) {
+	llm := &mockToolCallLLM{args: map[string]any{
+		"chunks": []any{
+			map[string]any{
+				"summary":  "Refactor auth",
+				"files":    "auth.go",
+				"diff":     "-old\n+new",
+				"lines":    float64(2),
+				"category": "refactor",
+			},
+		},
+	}}
+
+	chunker := revue.NewChunker(llm, "test-model")
+	result, err := chunker.Chunk(context.Background(), "fake diff")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(result.Chunks) != 1 {
+		t.Fatalf("expected 1 chunk, got %d", len(result.Chunks))
+	}
+	if result.Chunks[0].Summary != "Refactor auth" {
+		t.Errorf("unexpected summary: %s", result.Chunks[0].Summary)
+	}
+}
+
 func TestChunkerHandlesInvalidJSON(t *testing.T) {
 	llm := &mockLLM{response: "not json"}
 	chunker := revue.NewChunker(llm, "test-model")
