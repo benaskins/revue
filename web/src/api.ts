@@ -59,24 +59,97 @@ export async function fetchDiff(
   return res.text();
 }
 
-const CHUNK_PROMPT = `You are a code review assistant. Analyse the following unified diff from a GitHub pull request and group the changes into logical chunks.
+const MAX_CHUNK_LINES = 30;
 
-Each chunk should represent a coherent unit of change — for example:
-- A new feature with its tests
-- A mechanical rename across files
-- A configuration change
-- A bug fix with its guard clause
+interface RawChunk {
+  file: string;
+  diff: string;
+  lines: number;
+}
 
-IMPORTANT: Each chunk's diff MUST be 25 lines or fewer. If a logical change is larger than 25 lines, split it into smaller sub-chunks that each make sense on their own (e.g. split a feature from its tests, or split changes by file).
+export function splitDiff(diff: string): RawChunk[] {
+  if (!diff) return [];
 
-For each chunk, provide:
+  const lines = diff.split("\n");
+  const chunks: RawChunk[] = [];
+
+  let currentFile = "";
+  let hunkLines: string[] = [];
+  let changedCount = 0;
+
+  function flush() {
+    if (hunkLines.length === 0 || !currentFile) return;
+    const diffText = hunkLines.join("\n");
+    if (changedCount <= MAX_CHUNK_LINES) {
+      chunks.push({ file: currentFile, diff: diffText, lines: changedCount });
+    } else {
+      chunks.push(...subSplit(currentFile, hunkLines));
+    }
+    hunkLines = [];
+    changedCount = 0;
+  }
+
+  for (const line of lines) {
+    if (line.startsWith("diff --git")) {
+      flush();
+      const parts = line.split(" b/");
+      if (parts.length >= 2) currentFile = parts[1];
+    } else if (line.startsWith("--- ") || line.startsWith("+++ ")) {
+      continue;
+    } else if (line.startsWith("@@")) {
+      flush();
+      hunkLines.push(line);
+    } else if (line.startsWith("+") || line.startsWith("-")) {
+      hunkLines.push(line);
+      changedCount++;
+    } else if (hunkLines.length > 0) {
+      hunkLines.push(line);
+    }
+  }
+  flush();
+
+  return chunks;
+}
+
+function subSplit(file: string, lines: string[]): RawChunk[] {
+  const chunks: RawChunk[] = [];
+  let batch: string[] = [];
+  let changed = 0;
+
+  for (const line of lines) {
+    const isChanged = line.startsWith("+") || line.startsWith("-");
+
+    if (isChanged && changed >= MAX_CHUNK_LINES) {
+      chunks.push({ file, diff: batch.join("\n"), lines: changed });
+      batch = [];
+      changed = 0;
+    }
+
+    batch.push(line);
+    if (isChanged) changed++;
+  }
+
+  if (batch.length > 0 && changed > 0) {
+    chunks.push({ file, diff: batch.join("\n"), lines: changed });
+  }
+
+  return chunks;
+}
+
+const SEQUENCE_PROMPT = `You are a code review assistant. You will receive a list of pre-split diff chunks from a GitHub pull request. Each chunk has a file path, diff content, and line count.
+
+Your job is to:
+1. Sequence the chunks from most significant to least significant
+2. Add a summary and category to each chunk
+
+For each chunk, return:
 - "summary": a 1-2 sentence description of what this chunk does
-- "files": comma-separated list of files touched by this chunk
-- "diff": the exact unified diff lines belonging to this chunk (preserve the diff format)
-- "lines": count of diff lines (additions + deletions) in this chunk
+- "files": the file path (preserve from input)
+- "diff": the exact diff content (preserve from input)
+- "lines": the line count (preserve from input)
 - "category": one of "feature", "fix", "refactor", "test", "config", "docs", "chore"
 
-Return a JSON object with a "chunks" array. Order chunks from most significant to least significant.`;
+Return a JSON object with a "chunks" array containing all chunks in your recommended review order.`;
 
 const CHUNK_SCHEMA = {
   type: "json_schema" as const,
@@ -113,6 +186,8 @@ export async function chunkDiff(
   apiKey: string,
   model: string,
 ): Promise<ChunkResult> {
+  const rawChunks = splitDiff(diff);
+
   const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -125,7 +200,7 @@ export async function chunkDiff(
       messages: [
         {
           role: "user",
-          content: `${CHUNK_PROMPT}\n\nHere is the diff:\n\n${diff}`,
+          content: `${SEQUENCE_PROMPT}\n\nHere are the chunks:\n\n${JSON.stringify(rawChunks)}`,
         },
       ],
       response_format: CHUNK_SCHEMA,
