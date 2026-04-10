@@ -17,11 +17,23 @@ import "./index.css";
 
 type Phase = "input" | "loading" | "ready" | "review" | "summary";
 
-const BASE_MS = 60_000;
-const PER_LINE_MS = 1000;
+interface Speed {
+  label: string;
+  baseMs: number;
+  perLineMs: number;
+}
 
-function chunkDuration(lines: number): number {
-  return BASE_MS + lines * PER_LINE_MS;
+const SPEEDS: Record<string, Speed> = {
+  slow:    { label: "Slow (1m)",     baseMs: 60_000, perLineMs: 1000 },
+  normal:  { label: "Normal (30s)",  baseMs: 30_000, perLineMs: 500 },
+  fast:    { label: "Fast (15s)",    baseMs: 15_000, perLineMs: 250 },
+  rsvp:    { label: "RSVP (5s)",     baseMs: 5_000,  perLineMs: 100 },
+};
+
+const DEFAULT_SPEED = "normal";
+
+function chunkDuration(lines: number, speed: Speed): number {
+  return speed.baseMs + lines * speed.perLineMs;
 }
 
 function loadSetting(key: string, fallback: string): string {
@@ -205,6 +217,10 @@ export default function App() {
   const [model, setModel] = useState(() =>
     loadSetting("revue:model", DEFAULT_MODEL),
   );
+  const [speedKey, setSpeedKey] = useState(() =>
+    loadSetting("revue:speed", DEFAULT_SPEED),
+  );
+  const speed = SPEEDS[speedKey] || SPEEDS[DEFAULT_SPEED];
   const [githubToken, setGithubToken] = useState(() =>
     loadSetting("revue:githubToken", ""),
   );
@@ -314,6 +330,7 @@ export default function App() {
     saveSetting("revue:apiKey", apiKey);
     saveSetting("revue:model", model);
     saveSetting("revue:githubToken", githubToken);
+    saveSetting("revue:speed", speedKey);
     setShowSettings(false);
   }
 
@@ -358,7 +375,25 @@ export default function App() {
         </p>
 
         <label className="block text-xs text-[var(--revue-text-dim)] mb-1 tracking-wider uppercase">
-          OpenRouter API Key
+          Review Speed
+        </label>
+        <select
+          value={speedKey}
+          onChange={(e) => setSpeedKey(e.target.value)}
+          className="w-full px-3 py-2 mb-4 bg-[var(--revue-bg)] border border-[var(--revue-border)] text-[var(--revue-white)] text-sm focus:outline-none focus:border-[var(--revue-cyan)]"
+        >
+          {Object.entries(SPEEDS).map(([key, s]) => (
+            <option key={key} value={key}>
+              {s.label}
+            </option>
+          ))}
+        </select>
+
+        <label className="block text-xs text-[var(--revue-text-dim)] mb-1 tracking-wider uppercase">
+          OpenRouter API Key{" "}
+          <span className="normal-case tracking-normal opacity-50">
+            (optional)
+          </span>
         </label>
         <input
           type="password"
@@ -569,7 +604,7 @@ export default function App() {
           </p>
           <p className="text-[var(--revue-text-dim)] text-xs tracking-wider mb-10">
             estimated duration:{" "}
-            {Math.ceil((chunks.length * BASE_MS) / 60_000)} min
+            {Math.ceil((chunks.length * speed.baseMs) / 60_000)} min
           </p>
           <div className="animate-pulse">
             <p className="text-[var(--revue-cyan)] text-xs tracking-[0.2em] uppercase">
@@ -692,7 +727,7 @@ export default function App() {
     return null;
   }
 
-  const duration = chunkDuration(currentChunk.lines);
+  const duration = chunkDuration(currentChunk.lines, speed);
 
   return (
     <ReviewPhase
