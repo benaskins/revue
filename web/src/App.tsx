@@ -295,6 +295,10 @@ export default function App() {
       const result = apiKey.trim()
         ? await chunkDiff(diff, apiKey, model)
         : chunkDiffLocal(diff);
+
+      // Let the refinement animation breathe
+      await new Promise((r) => setTimeout(r, 3000));
+
       setChunks(result.chunks);
       setFlagged([]);
       setCurrentIndex(0);
