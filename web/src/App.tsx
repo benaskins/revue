@@ -351,8 +351,23 @@ export default function App() {
           </h2>
         </div>
 
+        <label className="block text-xs text-[var(--revue-text-dim)] mb-1 tracking-wider uppercase">
+          Review Speed
+        </label>
+        <select
+          value={speedKey}
+          onChange={(e) => setSpeedKey(e.target.value)}
+          className="w-full px-3 py-2 mb-4 bg-[var(--revue-bg)] border border-[var(--revue-border)] text-[var(--revue-white)] text-sm focus:outline-none focus:border-[var(--revue-cyan)]"
+        >
+          {Object.entries(SPEEDS).map(([key, s]) => (
+            <option key={key} value={key}>
+              {s.label}
+            </option>
+          ))}
+        </select>
+
         <p className="text-xs text-[var(--revue-text-dim)] mb-5 leading-relaxed opacity-70">
-          This terminal uses{" "}
+          This terminal optionally uses{" "}
           <a
             href="https://openrouter.ai"
             target="_blank"
@@ -373,21 +388,6 @@ export default function App() {
           </a>
           .
         </p>
-
-        <label className="block text-xs text-[var(--revue-text-dim)] mb-1 tracking-wider uppercase">
-          Review Speed
-        </label>
-        <select
-          value={speedKey}
-          onChange={(e) => setSpeedKey(e.target.value)}
-          className="w-full px-3 py-2 mb-4 bg-[var(--revue-bg)] border border-[var(--revue-border)] text-[var(--revue-white)] text-sm focus:outline-none focus:border-[var(--revue-cyan)]"
-        >
-          {Object.entries(SPEEDS).map(([key, s]) => (
-            <option key={key} value={key}>
-              {s.label}
-            </option>
-          ))}
-        </select>
 
         <label className="block text-xs text-[var(--revue-text-dim)] mb-1 tracking-wider uppercase">
           OpenRouter API Key{" "}
