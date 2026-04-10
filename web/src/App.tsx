@@ -7,6 +7,7 @@ import {
   parsePRURL,
   fetchDiff,
   chunkDiff,
+  chunkDiffLocal,
   splitDiff,
 } from "./api";
 import FlashCard from "./FlashCard";
@@ -279,10 +280,6 @@ export default function App() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!apiKey.trim()) {
-      setError("Credential required — configure your access key");
-      return;
-    }
     setError("");
 
     try {
@@ -294,8 +291,10 @@ export default function App() {
       setRawFragments(raw.map((c) => c.diff));
       setPhase("loading");
 
-      // LLM call for sequencing runs while animation plays
-      const result = await chunkDiff(diff, apiKey, model);
+      // Use LLM if API key is configured, otherwise heuristic
+      const result = apiKey.trim()
+        ? await chunkDiff(diff, apiKey, model)
+        : chunkDiffLocal(diff);
       setChunks(result.chunks);
       setFlagged([]);
       setCurrentIndex(0);
@@ -505,16 +504,11 @@ export default function App() {
             </button>
           </form>
 
-          {!apiKey && (
-            <p className="mt-6 text-[var(--revue-text-dim)] text-xs tracking-wider">
-              Configure your access key to proceed
-            </p>
-          )}
-          {apiKey && (
-            <p className="mt-6 text-[var(--revue-text-dim)] text-xs tracking-wider">
-              Engine: {MODELS.find((m) => m.id === model)?.name || model}
-            </p>
-          )}
+          <p className="mt-6 text-[var(--revue-text-dim)] text-xs tracking-wider">
+            {apiKey
+              ? `Engine: ${MODELS.find((m) => m.id === model)?.name || model}`
+              : "Heuristic mode — configure an API key for AI-powered summaries"}
+          </p>
           {error && (
             <p className="mt-4 text-[var(--revue-red)] text-xs tracking-wider">
               {error}

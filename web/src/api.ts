@@ -1,3 +1,5 @@
+import { annotateChunks } from "./heuristic";
+
 export interface Chunk {
   summary: string;
   files: string;
@@ -225,6 +227,12 @@ export async function chunkDiff(
   }
 
   return JSON.parse(content) as ChunkResult;
+}
+
+// Heuristic chunking — no API key required
+export function chunkDiffLocal(diff: string): ChunkResult {
+  const rawChunks = splitDiff(diff);
+  return { chunks: annotateChunks(rawChunks) };
 }
 
 export interface ModelOption {
