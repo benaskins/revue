@@ -23,26 +23,22 @@ type ChunkResult struct {
 	Chunks []Chunk `json:"chunks"`
 }
 
-const chunkPrompt = `You are a code review assistant. Analyse the following unified diff from a GitHub pull request and group the changes into logical chunks.
+const sequencePrompt = `You are a code review assistant. You will receive a list of pre-split diff chunks from a GitHub pull request. Each chunk has a file path, diff content, and line count.
 
-Each chunk should represent a coherent unit of change — for example:
-- A new feature with its tests
-- A mechanical rename across files
-- A configuration change
-- A bug fix with its guard clause
+Your job is to:
+1. Sequence the chunks from most significant to least significant
+2. Add a summary and category to each chunk
 
-IMPORTANT: Each chunk's diff MUST be 25 lines or fewer. If a logical change is larger than 25 lines, split it into smaller sub-chunks that each make sense on their own (e.g. split a feature from its tests, or split changes by file).
-
-For each chunk, provide:
+For each chunk, return:
 - "summary": a 1-2 sentence description of what this chunk does
-- "files": comma-separated list of files touched by this chunk
-- "diff": the exact unified diff lines belonging to this chunk (preserve the diff format)
-- "lines": count of diff lines (additions + deletions) in this chunk
+- "files": the file path (preserve from input)
+- "diff": the exact diff content (preserve from input)
+- "lines": the line count (preserve from input)
 - "category": one of "feature", "fix", "refactor", "test", "config", "docs", "chore"
 
-Return a JSON object with a "chunks" array. Order chunks from most significant to least significant.
+Return a JSON object with a "chunks" array containing all chunks in your recommended review order.
 
-Here is the diff:
+Here are the chunks:
 
 %s`
 
@@ -78,17 +74,24 @@ func NewChunker(client talk.LLMClient, model string) *Chunker {
 	return &Chunker{client: client, model: model}
 }
 
-// Chunk analyses a unified diff and returns logical chunks.
+// Chunk splits a unified diff deterministically, then asks the LLM
+// to sequence and annotate the chunks.
 func (c *Chunker) Chunk(ctx context.Context, diff string) (*ChunkResult, error) {
+	rawChunks := SplitDiff(diff)
+
+	chunksJSON, err := json.Marshal(rawChunks)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal chunks: %w", err)
+	}
+
 	req := talk.NewRequest(c.model, []talk.Message{
-		{Role: talk.RoleUser, Content: fmt.Sprintf(chunkPrompt, diff)},
+		{Role: talk.RoleUser, Content: fmt.Sprintf(sequencePrompt, string(chunksJSON))},
 	}, talk.WithStructuredOutput(chunkSchema))
 
 	var buf strings.Builder
 	var toolArgs map[string]any
-	err := c.client.Chat(ctx, req, func(resp talk.Response) error {
+	err = c.client.Chat(ctx, req, func(resp talk.Response) error {
 		buf.WriteString(resp.Content)
-		// Anthropic returns structured output as a tool call
 		for _, tc := range resp.ToolCalls {
 			if tc.Name == "structured_response" {
 				toolArgs = tc.Arguments
@@ -97,10 +100,9 @@ func (c *Chunker) Chunk(ctx context.Context, diff string) (*ChunkResult, error) 
 		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("LLM chunking failed: %w", err)
+		return nil, fmt.Errorf("LLM sequencing failed: %w", err)
 	}
 
-	// Prefer tool call arguments (Anthropic), fall back to text content (OpenAI)
 	var raw []byte
 	if toolArgs != nil {
 		raw, _ = json.Marshal(toolArgs)

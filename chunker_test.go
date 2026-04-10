@@ -2,6 +2,7 @@ package revue_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/benaskins/axon-talk"
@@ -9,45 +10,64 @@ import (
 )
 
 type mockLLM struct {
-	response string
+	response    string
+	lastRequest string
 }
 
-func (m *mockLLM) Chat(_ context.Context, _ *talk.Request, fn func(talk.Response) error) error {
+func (m *mockLLM) Chat(_ context.Context, req *talk.Request, fn func(talk.Response) error) error {
+	if len(req.Messages) > 0 {
+		m.lastRequest = req.Messages[0].Content
+	}
 	return fn(talk.Response{Content: m.response, Done: true})
 }
 
-func TestChunkerReturnsChunks(t *testing.T) {
+func TestChunkerSplitsThenSequences(t *testing.T) {
+	// LLM returns sequenced chunks with summaries
 	llm := &mockLLM{response: `{
 		"chunks": [
 			{
-				"summary": "Add user validation",
-				"files": "user.go",
-				"diff": "+func validate() {}",
-				"lines": 1,
+				"summary": "Add new route handlers",
+				"files": "server.go",
+				"diff": "+handler code",
+				"lines": 3,
 				"category": "feature"
+			},
+			{
+				"summary": "Add imports",
+				"files": "server.go",
+				"diff": "+import code",
+				"lines": 2,
+				"category": "chore"
 			}
 		]
 	}`}
 
+	diff := "diff --git a/server.go b/server.go\n--- a/server.go\n+++ b/server.go\n@@ -1,2 +1,4 @@\n+import1\n+import2\n@@ -10,2 +12,5 @@\n+handler1\n+handler2\n+handler3\n"
+
 	chunker := revue.NewChunker(llm, "test-model")
-	result, err := chunker.Chunk(context.Background(), "fake diff")
+	result, err := chunker.Chunk(context.Background(), diff)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if len(result.Chunks) != 1 {
-		t.Fatalf("expected 1 chunk, got %d", len(result.Chunks))
+	if len(result.Chunks) != 2 {
+		t.Fatalf("expected 2 chunks, got %d", len(result.Chunks))
 	}
 
-	chunk := result.Chunks[0]
-	if chunk.Summary != "Add user validation" {
-		t.Errorf("unexpected summary: %s", chunk.Summary)
+	// Verify LLM received pre-split chunks, not raw diff
+	if !strings.Contains(llm.lastRequest, `"file"`) {
+		t.Error("expected LLM prompt to contain pre-split chunk data with file field")
 	}
-	if chunk.Lines != 1 {
-		t.Errorf("expected 1 line, got %d", chunk.Lines)
+	if strings.Contains(llm.lastRequest, "diff --git") {
+		t.Error("expected LLM prompt to NOT contain raw diff header — should receive structured chunks")
 	}
-	if chunk.Category != "feature" {
-		t.Errorf("unexpected category: %s", chunk.Category)
+
+	// Verify result has LLM-provided summaries
+	if result.Chunks[0].Summary != "Add new route handlers" {
+		t.Errorf("unexpected summary: %s", result.Chunks[0].Summary)
+	}
+	if result.Chunks[0].Category != "feature" {
+		t.Errorf("unexpected category: %s", result.Chunks[0].Category)
 	}
 }
 
@@ -75,8 +95,10 @@ func TestChunkerReturnsChunksFromToolCall(t *testing.T) {
 		},
 	}}
 
+	diff := "diff --git a/auth.go b/auth.go\n--- a/auth.go\n+++ b/auth.go\n@@ -1,1 +1,1 @@\n-old\n+new\n"
+
 	chunker := revue.NewChunker(llm, "test-model")
-	result, err := chunker.Chunk(context.Background(), "fake diff")
+	result, err := chunker.Chunk(context.Background(), diff)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -93,7 +115,8 @@ func TestChunkerHandlesInvalidJSON(t *testing.T) {
 	llm := &mockLLM{response: "not json"}
 	chunker := revue.NewChunker(llm, "test-model")
 
-	_, err := chunker.Chunk(context.Background(), "fake diff")
+	diff := "diff --git a/x.go b/x.go\n--- a/x.go\n+++ b/x.go\n@@ -1,1 +1,1 @@\n+line\n"
+	_, err := chunker.Chunk(context.Background(), diff)
 	if err == nil {
 		t.Fatal("expected error for invalid JSON")
 	}
