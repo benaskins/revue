@@ -573,6 +573,9 @@ export default function App() {
                 Inspect source
               </a>
             </p>
+            <p className="mt-2 opacity-50">
+              &copy; 2026 Benjamin Askins. MIT License.
+            </p>
           </div>
         </div>
       </div>
