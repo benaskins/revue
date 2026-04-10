@@ -80,14 +80,30 @@ function seededShuffle<T>(arr: T[], seed: number): T[] {
   return out;
 }
 
+// Tag ~20% of chunks as "scary" using a deterministic hash
+function isScary(index: number, total: number): boolean {
+  const hash = ((index + 1) * 2654435761) >>> 0;
+  return hash % 5 === 0 && total > 3;
+}
+
 function RefinementAnimation({ fragments }: { fragments: string[] }) {
   const message = useRotatingMessage(REASSURANCES, 2500);
   const items = fragments.length > 0 ? fragments : FALLBACK_FRAGMENTS;
   const [order, setOrder] = useState(() => items.map((_, i) => i));
+  const [visible, setVisible] = useState(false);
+
+  // Fade in on mount
+  useEffect(() => {
+    const t = setTimeout(() => setVisible(true), 50);
+    return () => clearTimeout(t);
+  }, []);
 
   useEffect(() => {
     setOrder(items.map((_, i) => i));
   }, [items.length]);
+
+  // Rotate which chunks are "scary" every shuffle
+  const [scaryOffset, setScaryOffset] = useState(0);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -95,15 +111,21 @@ function RefinementAnimation({ fragments }: { fragments: string[] }) {
         const seed = Date.now();
         return seededShuffle(prev, seed);
       });
+      setScaryOffset((prev) => prev + 1);
     }, 4000);
     return () => clearInterval(timer);
   }, []);
 
-  // Aim for 3-4 columns depending on count
   const cols = items.length <= 4 ? 2 : items.length <= 9 ? 3 : 4;
 
   return (
-    <div className="flex flex-col items-center gap-8">
+    <div
+      className="flex flex-col items-center gap-8"
+      style={{
+        opacity: visible ? 1 : 0,
+        transition: "opacity 1.2s ease-in",
+      }}
+    >
       <div
         className="grid gap-3"
         style={{
@@ -111,25 +133,40 @@ function RefinementAnimation({ fragments }: { fragments: string[] }) {
           width: "min(95vw, 900px)",
         }}
       >
-        {order.map((fragIndex, gridPos) => (
-          <div
-            key={fragIndex}
-            className="bg-[var(--revue-panel)] border border-[var(--revue-border)] p-3 overflow-hidden"
-            style={{
-              height: "8rem",
-              order: gridPos,
-              transition: "all 2.5s cubic-bezier(0.4, 0, 0.2, 1)",
-              opacity: 0.7 + (fragIndex % 3) * 0.1,
-            }}
-          >
-            <pre
-              className="text-[11px] leading-[1.5] whitespace-pre-wrap"
-              style={{ color: "var(--revue-text)" }}
+        {order.map((fragIndex, gridPos) => {
+          const scary = isScary(fragIndex + scaryOffset, items.length);
+          return (
+            <div
+              key={fragIndex}
+              className="p-3 overflow-hidden"
+              style={{
+                height: "8rem",
+                order: gridPos,
+                transition: "all 2.5s cubic-bezier(0.4, 0, 0.2, 1)",
+                opacity: 0.7 + (fragIndex % 3) * 0.1,
+                background: scary
+                  ? "linear-gradient(135deg, var(--revue-panel), rgba(224, 108, 96, 0.06))"
+                  : "var(--revue-panel)",
+                border: scary
+                  ? "1px solid rgba(224, 108, 96, 0.25)"
+                  : "1px solid var(--revue-border)",
+                boxShadow: scary
+                  ? "0 0 12px rgba(224, 108, 96, 0.06)"
+                  : "none",
+              }}
             >
-              {items[fragIndex]}
-            </pre>
-          </div>
-        ))}
+              <pre
+                className="text-[11px] leading-[1.5] whitespace-pre-wrap"
+                style={{
+                  color: scary ? "var(--revue-red)" : "var(--revue-text)",
+                  transition: "color 2s ease",
+                }}
+              >
+                {items[fragIndex]}
+              </pre>
+            </div>
+          );
+        })}
       </div>
 
       <div className="text-center">
