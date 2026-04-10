@@ -219,6 +219,14 @@ export default function App() {
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
+      // Escape always dismisses the note dialog, even from textarea
+      if (e.code === "Escape" && paused && phase === "review") {
+        e.preventDefault();
+        setNote("");
+        setPaused(false);
+        return;
+      }
+
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") {
         if (
@@ -254,13 +262,14 @@ export default function App() {
       if (phase !== "review") return;
 
       if (e.code === "Space" && !paused) {
+        // Flag — open note dialog
         e.preventDefault();
         setPaused(true);
         setTimeout(() => noteRef.current?.focus(), 50);
-      } else if (e.code === "Escape" && paused) {
+      } else if (e.code === "ArrowRight" && !paused) {
+        // Skip — advance to next chunk
         e.preventDefault();
-        setNote("");
-        setPaused(false);
+        advance();
       }
     }
 
@@ -860,20 +869,25 @@ function ReviewPhase({
       {/* Bottom status — escalates with urgency */}
       <div className="text-center pb-4 flex items-center justify-center gap-6">
         {!paused && (
-          <span
-            key={promptMessage}
-            className="text-[10px] tracking-[0.2em] uppercase"
-            style={{
-              color: critical
-                ? "var(--revue-red)"
-                : urgent
-                  ? "var(--revue-yellow)"
-                  : "var(--revue-text-dim)",
-              animation: `bin-reveal 0.3s ease-out${critical ? ", glow-pulse 0.8s ease-in-out infinite" : ""}`,
-            }}
-          >
-            {promptMessage}
-          </span>
+          <>
+            <span
+              key={promptMessage}
+              className="text-[10px] tracking-[0.2em] uppercase"
+              style={{
+                color: critical
+                  ? "var(--revue-red)"
+                  : urgent
+                    ? "var(--revue-yellow)"
+                    : "var(--revue-text-dim)",
+                animation: `bin-reveal 0.3s ease-out${critical ? ", glow-pulse 0.8s ease-in-out infinite" : ""}`,
+              }}
+            >
+              {promptMessage}
+            </span>
+            <span className="text-[10px] text-[var(--revue-text-dim)] tracking-wider opacity-40">
+              → skip
+            </span>
+          </>
         )}
         {flaggedCount > 0 && (
           <span className="text-[10px] text-[var(--revue-yellow)] tracking-wider opacity-60">
