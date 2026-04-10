@@ -543,11 +543,18 @@ export default function App() {
             </button>
           </form>
 
-          <p className="mt-6 text-[var(--revue-text-dim)] text-xs tracking-wider">
-            {apiKey
-              ? `Engine: ${MODELS.find((m) => m.id === model)?.name || model}`
-              : "Heuristic mode — configure an API key for AI-powered summaries"}
-          </p>
+          <div className="mt-6 text-center">
+            <p className="text-[var(--revue-text-dim)] text-xs tracking-wider">
+              {apiKey
+                ? `Engine: ${MODELS.find((m) => m.id === model)?.name || model}`
+                : "Heuristic mode"}
+            </p>
+            {!apiKey && (
+              <p className="text-[var(--revue-text-dim)] text-[10px] tracking-wider opacity-50 mt-1">
+                configure an API key for AI-powered summaries
+              </p>
+            )}
+          </div>
           {error && (
             <p className="mt-4 text-[var(--revue-red)] text-xs tracking-wider">
               {error}
