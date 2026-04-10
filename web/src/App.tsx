@@ -7,6 +7,7 @@ import {
   parsePRURL,
   fetchDiff,
   chunkDiff,
+  splitDiff,
 } from "./api";
 import FlashCard from "./FlashCard";
 import TimerBar from "./TimerBar";
@@ -44,8 +45,8 @@ const REASSURANCES = [
   "Not all code is scary",
   "Trust your feelings",
   "You are doing important work",
-  "The data wants to be sorted",
-  "Your outie appreciates this",
+  "The code wants to be understood",
+  "The author appreciates this",
   "Stay calm and refine",
 ];
 
@@ -60,62 +61,87 @@ function useRotatingMessage(messages: string[], intervalMs: number): string {
   return messages[index];
 }
 
-// Lumon-style data refinement animation
-function RefinementAnimation() {
+const FALLBACK_FRAGMENTS = [
+  "// loading...",
+  "// preparing review...",
+  "// parsing diff...",
+  "// analysing changes...",
+];
+
+// Deterministic shuffle using a seed — avoids Math.random in render
+function seededShuffle<T>(arr: T[], seed: number): T[] {
+  const out = [...arr];
+  let s = seed;
+  for (let i = out.length - 1; i > 0; i--) {
+    s = (s * 16807 + 0) % 2147483647;
+    const j = s % (i + 1);
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
+function RefinementAnimation({ fragments }: { fragments: string[] }) {
   const message = useRotatingMessage(REASSURANCES, 2500);
-  const symbols = ["+", "-", "@@", "fn", "{}", "->", "+", "-", "//", "++"];
+  const items = fragments.length > 0 ? fragments : FALLBACK_FRAGMENTS;
+  const [order, setOrder] = useState(() => items.map((_, i) => i));
+
+  useEffect(() => {
+    setOrder(items.map((_, i) => i));
+  }, [items.length]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setOrder((prev) => {
+        const seed = Date.now();
+        return seededShuffle(prev, seed);
+      });
+    }, 4000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Aim for 3-4 columns depending on count
+  const cols = items.length <= 4 ? 2 : items.length <= 9 ? 3 : 4;
+
   return (
     <div className="flex flex-col items-center gap-8">
-      <div className="relative w-72 h-72">
-        {/* Outer boundary */}
-        <div
-          className="absolute inset-0 border border-[var(--lumon-border)] rounded-full animate-[spin_12s_linear_infinite]"
-          style={{ boxShadow: "0 0 20px rgba(79, 209, 197, 0.05)" }}
-        />
-        <div className="absolute inset-6 border border-[var(--lumon-border)] rounded-full animate-[spin_8s_linear_infinite_reverse]" />
-        <div className="absolute inset-12 border border-[var(--lumon-cyan-dim)] rounded-full animate-[spin_6s_linear_infinite]" />
-
-        {/* Centre core */}
-        <div className="absolute inset-0 flex items-center justify-center">
+      <div
+        className="grid gap-3"
+        style={{
+          gridTemplateColumns: `repeat(${cols}, 1fr)`,
+          width: "min(95vw, 900px)",
+        }}
+      >
+        {order.map((fragIndex, gridPos) => (
           <div
-            className="w-4 h-4 rounded-full"
+            key={fragIndex}
+            className="bg-[var(--revue-panel)] border border-[var(--revue-border)] p-3 overflow-hidden"
             style={{
-              background: "var(--lumon-cyan)",
-              boxShadow:
-                "0 0 12px var(--lumon-cyan-glow), 0 0 30px rgba(79, 209, 197, 0.1)",
-              animation: "glow-pulse 2s ease-in-out infinite",
-            }}
-          />
-        </div>
-
-        {/* Drifting data symbols */}
-        {symbols.map((sym, i) => (
-          <div
-            key={i}
-            className="absolute text-xs"
-            style={{
-              color: "var(--lumon-text-dim)",
-              top: `${15 + Math.sin(i * 0.9) * 35}%`,
-              left: `${10 + ((i * 13) % 80)}%`,
-              animation: `data-drift ${3 + (i % 3)}s ease-in-out infinite`,
-              animationDelay: `${i * 0.4}s`,
+              height: "8rem",
+              order: gridPos,
+              transition: "all 2.5s cubic-bezier(0.4, 0, 0.2, 1)",
+              opacity: 0.7 + (fragIndex % 3) * 0.1,
             }}
           >
-            {sym}
+            <pre
+              className="text-[11px] leading-[1.5] whitespace-pre-wrap"
+              style={{ color: "var(--revue-text)" }}
+            >
+              {items[fragIndex]}
+            </pre>
           </div>
         ))}
       </div>
 
       <div className="text-center">
         <p
-          className="text-[var(--lumon-white)] text-sm tracking-[0.2em] uppercase mb-3"
+          className="text-[var(--revue-white)] text-sm tracking-[0.2em] uppercase mb-3"
           style={{ animation: "glow-pulse 3s ease-in-out infinite" }}
         >
-          Refining Data
+          Refining Code
         </p>
         <p
           key={message}
-          className="text-[var(--lumon-text-dim)] text-xs tracking-wider h-4"
+          className="text-[var(--revue-text-dim)] text-xs tracking-wider h-4"
           style={{ animation: "bin-reveal 0.4s ease-out" }}
         >
           {message}
@@ -129,6 +155,7 @@ export default function App() {
   const [url, setUrl] = useState("");
   const [phase, setPhase] = useState<Phase>("input");
   const [chunks, setChunks] = useState<Chunk[]>([]);
+  const [rawFragments, setRawFragments] = useState<string[]>([]);
   const [error, setError] = useState("");
   const [currentIndex, setCurrentIndex] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -211,11 +238,17 @@ export default function App() {
       return;
     }
     setError("");
-    setPhase("loading");
 
     try {
       const ref = parsePRURL(url);
       const diff = await fetchDiff(ref, githubToken || undefined);
+
+      // Split deterministically and show real code in the animation
+      const raw = splitDiff(diff);
+      setRawFragments(raw.map((c) => c.diff));
+      setPhase("loading");
+
+      // LLM call for sequencing runs while animation plays
       const result = await chunkDiff(diff, apiKey, model);
       setChunks(result.chunks);
       setFlagged([]);
@@ -238,27 +271,27 @@ export default function App() {
   // --- Settings terminal ---
   const settingsPanel = showSettings && (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-      <div className="w-full max-w-md mx-6 bg-[var(--lumon-panel)] border border-[var(--lumon-border)] p-6">
-        <div className="flex items-center gap-3 mb-6 pb-3 border-b border-[var(--lumon-border)]">
+      <div className="w-full max-w-md mx-6 bg-[var(--revue-panel)] border border-[var(--revue-border)] p-6">
+        <div className="flex items-center gap-3 mb-6 pb-3 border-b border-[var(--revue-border)]">
           <div
             className="w-2 h-2 rounded-full"
             style={{
-              background: "var(--lumon-cyan)",
-              boxShadow: "0 0 6px var(--lumon-cyan-glow)",
+              background: "var(--revue-cyan)",
+              boxShadow: "0 0 6px var(--revue-cyan-glow)",
             }}
           />
-          <h2 className="text-xs tracking-[0.3em] text-[var(--lumon-cyan)] uppercase">
+          <h2 className="text-xs tracking-[0.3em] text-[var(--revue-cyan)] uppercase">
             Terminal Configuration
           </h2>
         </div>
 
-        <p className="text-xs text-[var(--lumon-text-dim)] mb-5 leading-relaxed opacity-70">
+        <p className="text-xs text-[var(--revue-text-dim)] mb-5 leading-relaxed opacity-70">
           This terminal uses{" "}
           <a
             href="https://openrouter.ai"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-[var(--lumon-cyan)] hover:underline"
+            className="text-[var(--revue-cyan)] hover:underline"
           >
             OpenRouter
           </a>{" "}
@@ -268,14 +301,14 @@ export default function App() {
             href="https://openrouter.ai/keys"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-[var(--lumon-cyan)] hover:underline"
+            className="text-[var(--revue-cyan)] hover:underline"
           >
             openrouter.ai/keys
           </a>
           .
         </p>
 
-        <label className="block text-xs text-[var(--lumon-text-dim)] mb-1 tracking-wider uppercase">
+        <label className="block text-xs text-[var(--revue-text-dim)] mb-1 tracking-wider uppercase">
           OpenRouter API Key
         </label>
         <input
@@ -283,16 +316,16 @@ export default function App() {
           value={apiKey}
           onChange={(e) => setApiKey(e.target.value)}
           placeholder="sk-or-..."
-          className="w-full px-3 py-2 mb-4 bg-[var(--lumon-bg)] border border-[var(--lumon-border)] text-[var(--lumon-white)] text-sm focus:outline-none focus:border-[var(--lumon-cyan)]"
+          className="w-full px-3 py-2 mb-4 bg-[var(--revue-bg)] border border-[var(--revue-border)] text-[var(--revue-white)] text-sm focus:outline-none focus:border-[var(--revue-cyan)]"
         />
 
-        <label className="block text-xs text-[var(--lumon-text-dim)] mb-1 tracking-wider uppercase">
+        <label className="block text-xs text-[var(--revue-text-dim)] mb-1 tracking-wider uppercase">
           Refinement Engine
         </label>
         <select
           value={model}
           onChange={(e) => setModel(e.target.value)}
-          className="w-full px-3 py-2 mb-4 bg-[var(--lumon-bg)] border border-[var(--lumon-border)] text-[var(--lumon-white)] text-sm focus:outline-none focus:border-[var(--lumon-cyan)]"
+          className="w-full px-3 py-2 mb-4 bg-[var(--revue-bg)] border border-[var(--revue-border)] text-[var(--revue-white)] text-sm focus:outline-none focus:border-[var(--revue-cyan)]"
         >
           {MODELS.map((m) => (
             <option key={m.id} value={m.id}>
@@ -301,7 +334,7 @@ export default function App() {
           ))}
         </select>
 
-        <label className="block text-xs text-[var(--lumon-text-dim)] mb-1 tracking-wider uppercase">
+        <label className="block text-xs text-[var(--revue-text-dim)] mb-1 tracking-wider uppercase">
           Repository Credential{" "}
           <span className="normal-case tracking-normal opacity-50">
             (optional)
@@ -312,17 +345,17 @@ export default function App() {
           value={githubToken}
           onChange={(e) => setGithubToken(e.target.value)}
           placeholder="ghp_..."
-          className="w-full px-3 py-2 mb-6 bg-[var(--lumon-bg)] border border-[var(--lumon-border)] text-[var(--lumon-white)] text-sm focus:outline-none focus:border-[var(--lumon-cyan)]"
+          className="w-full px-3 py-2 mb-6 bg-[var(--revue-bg)] border border-[var(--revue-border)] text-[var(--revue-white)] text-sm focus:outline-none focus:border-[var(--revue-cyan)]"
         />
 
-        <p className="text-xs text-[var(--lumon-text-dim)] mb-6 leading-relaxed opacity-60">
+        <p className="text-xs text-[var(--revue-text-dim)] mb-6 leading-relaxed opacity-60">
           All credentials remain in local storage. No data leaves this
           terminal except to OpenRouter and GitHub.{" "}
           <a
             href="https://github.com/benaskins/revue"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-[var(--lumon-text)] underline hover:text-[var(--lumon-cyan)]"
+            className="text-[var(--revue-text)] underline hover:text-[var(--revue-cyan)]"
           >
             Inspect source
           </a>
@@ -331,13 +364,13 @@ export default function App() {
         <div className="flex gap-3 justify-end">
           <button
             onClick={() => setShowSettings(false)}
-            className="px-4 py-2 text-xs tracking-wider text-[var(--lumon-text-dim)] border border-[var(--lumon-border)] hover:border-[var(--lumon-text-dim)] transition-colors uppercase"
+            className="px-4 py-2 text-xs tracking-wider text-[var(--revue-text-dim)] border border-[var(--revue-border)] hover:border-[var(--revue-text-dim)] transition-colors uppercase"
           >
             Dismiss
           </button>
           <button
             onClick={handleSaveSettings}
-            className="px-4 py-2 text-xs tracking-wider text-[var(--lumon-bg)] bg-[var(--lumon-cyan)] hover:brightness-110 transition-all uppercase"
+            className="px-4 py-2 text-xs tracking-wider text-[var(--revue-bg)] bg-[var(--revue-cyan)] hover:brightness-110 transition-all uppercase"
           >
             Confirm
           </button>
@@ -349,7 +382,7 @@ export default function App() {
   const settingsButton = (
     <button
       onClick={() => setShowSettings(true)}
-      className="fixed top-4 right-4 p-2 text-[var(--lumon-text-dim)] hover:text-[var(--lumon-cyan)] transition-colors z-40"
+      className="fixed top-4 right-4 p-2 text-[var(--revue-text-dim)] hover:text-[var(--revue-cyan)] transition-colors z-40"
       title="Terminal Configuration"
     >
       <svg
@@ -377,14 +410,32 @@ export default function App() {
         <div className="w-full max-w-lg px-6 text-center">
           <div className="mb-8">
             <h1
-              className="text-3xl font-light tracking-[0.4em] text-[var(--lumon-white)] uppercase mb-3"
+              className="text-3xl font-light tracking-[0.4em] text-[var(--revue-white)] uppercase mb-3"
               style={{ animation: "glow-pulse 4s ease-in-out infinite" }}
             >
               Revue
             </h1>
-            <div className="w-16 h-px bg-[var(--lumon-border)] mx-auto mb-3" />
-            <p className="text-xs tracking-[0.2em] text-[var(--lumon-text-dim)] uppercase">
-              Code Refinement Terminal
+            <div className="w-16 h-px bg-[var(--revue-border)] mx-auto mb-3" />
+            <p className="text-xs tracking-[0.2em] text-[var(--revue-text-dim)] uppercase">
+              Code Refinement Terminal by{" "}
+              <span className="relative inline-block group">
+                <span className="text-[var(--revue-text)] cursor-default">
+                  Axon
+                </span>
+                <span
+                  className="absolute left-1/2 -translate-x-1/2 top-full mt-2 px-3 py-1.5 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
+                  style={{
+                    background: "var(--revue-panel)",
+                    border: "1px solid var(--revue-border)",
+                    color: "var(--revue-text-dim)",
+                    fontSize: "9px",
+                    letterSpacing: "0.15em",
+                    boxShadow: "0 0 8px rgba(79, 209, 197, 0.08)",
+                  }}
+                >
+                  a division of lamina corporation
+                </span>
+              </span>
             </p>
           </div>
 
@@ -395,11 +446,11 @@ export default function App() {
               onChange={(e) => setUrl(e.target.value)}
               placeholder="Enter pull request location"
               required
-              className="w-full px-4 py-3 bg-[var(--lumon-panel)] border border-[var(--lumon-border)] text-[var(--lumon-white)] text-sm text-center tracking-wide focus:outline-none focus:border-[var(--lumon-cyan)] transition-colors"
+              className="w-full px-4 py-3 bg-[var(--revue-panel)] border border-[var(--revue-border)] text-[var(--revue-white)] text-sm text-center tracking-wide placeholder:text-[var(--revue-text-dim)] placeholder:opacity-50 focus:outline-none focus:border-[var(--revue-cyan)] transition-colors"
             />
             <button
               type="submit"
-              className="px-6 py-3 text-xs tracking-[0.3em] uppercase text-[var(--lumon-bg)] bg-[var(--lumon-cyan)] hover:brightness-110 transition-all"
+              className="px-6 py-3 text-xs tracking-[0.3em] uppercase text-[var(--revue-bg)] bg-[var(--revue-cyan)] hover:brightness-110 transition-all"
               style={{
                 boxShadow: "0 0 15px rgba(79, 209, 197, 0.15)",
               }}
@@ -409,29 +460,29 @@ export default function App() {
           </form>
 
           {!apiKey && (
-            <p className="mt-6 text-[var(--lumon-text-dim)] text-xs tracking-wider">
+            <p className="mt-6 text-[var(--revue-text-dim)] text-xs tracking-wider">
               Configure your access key to proceed
             </p>
           )}
           {apiKey && (
-            <p className="mt-6 text-[var(--lumon-text-dim)] text-xs tracking-wider opacity-50">
+            <p className="mt-6 text-[var(--revue-text-dim)] text-xs tracking-wider">
               Engine: {MODELS.find((m) => m.id === model)?.name || model}
             </p>
           )}
           {error && (
-            <p className="mt-4 text-[var(--lumon-red)] text-xs tracking-wider">
+            <p className="mt-4 text-[var(--revue-red)] text-xs tracking-wider">
               {error}
             </p>
           )}
 
-          <div className="mt-16 text-[10px] text-[var(--lumon-text-dim)] opacity-40 tracking-wider leading-relaxed">
+          <div className="mt-16 text-[10px] text-[var(--revue-text-dim)] opacity-70 tracking-wider leading-relaxed">
             <p>
               This terminal operates entirely within your browser.{" "}
               <a
                 href="https://github.com/benaskins/revue"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="underline hover:text-[var(--lumon-text)]"
+                className="underline hover:text-[var(--revue-text)]"
               >
                 Inspect source
               </a>
@@ -446,7 +497,7 @@ export default function App() {
   if (phase === "loading") {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <RefinementAnimation />
+        <RefinementAnimation fragments={rawFragments} />
       </div>
     );
   }
@@ -456,28 +507,28 @@ export default function App() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <p className="text-[var(--lumon-text-dim)] text-xs tracking-[0.3em] uppercase mb-6">
+          <p className="text-[var(--revue-text-dim)] text-xs tracking-[0.3em] uppercase mb-6">
             Refinement Complete
           </p>
           <div
-            className="text-7xl font-light text-[var(--lumon-cyan)] mb-4"
+            className="text-7xl font-light text-[var(--revue-cyan)] mb-4"
             style={{
               animation: "glow-pulse 3s ease-in-out infinite",
               textShadow:
-                "0 0 20px var(--lumon-cyan-glow), 0 0 40px rgba(79, 209, 197, 0.1)",
+                "0 0 20px var(--revue-cyan-glow), 0 0 40px rgba(79, 209, 197, 0.1)",
             }}
           >
             {chunks.length}
           </div>
-          <p className="text-[var(--lumon-text)] text-sm tracking-wider mb-2">
+          <p className="text-[var(--revue-text)] text-sm tracking-wider mb-2">
             bins ready for review
           </p>
-          <p className="text-[var(--lumon-text-dim)] text-xs tracking-wider mb-10">
+          <p className="text-[var(--revue-text-dim)] text-xs tracking-wider mb-10">
             estimated duration:{" "}
             {Math.ceil((chunks.length * BASE_MS) / 60_000)} min
           </p>
           <div className="animate-pulse">
-            <p className="text-[var(--lumon-cyan)] text-xs tracking-[0.2em] uppercase">
+            <p className="text-[var(--revue-cyan)] text-xs tracking-[0.2em] uppercase">
               Press spacebar to begin session
             </p>
           </div>
@@ -492,24 +543,24 @@ export default function App() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="w-full max-w-2xl px-6">
           <div className="text-center mb-8">
-            <p className="text-[var(--lumon-text-dim)] text-xs tracking-[0.3em] uppercase mb-3">
+            <p className="text-[var(--revue-text-dim)] text-xs tracking-[0.3em] uppercase mb-3">
               Session Complete
             </p>
             <div className="flex items-center justify-center gap-6">
               <div>
-                <div className="text-3xl text-[var(--lumon-cyan)]">
+                <div className="text-3xl text-[var(--revue-cyan)]">
                   {flagged.length}
                 </div>
-                <div className="text-[10px] text-[var(--lumon-text-dim)] tracking-wider uppercase">
+                <div className="text-[10px] text-[var(--revue-text-dim)] tracking-wider uppercase">
                   Flagged
                 </div>
               </div>
-              <div className="w-px h-8 bg-[var(--lumon-border)]" />
+              <div className="w-px h-8 bg-[var(--revue-border)]" />
               <div>
-                <div className="text-3xl text-[var(--lumon-text)]">
+                <div className="text-3xl text-[var(--revue-text)]">
                   {chunks.length}
                 </div>
-                <div className="text-[10px] text-[var(--lumon-text-dim)] tracking-wider uppercase">
+                <div className="text-[10px] text-[var(--revue-text-dim)] tracking-wider uppercase">
                   Total
                 </div>
               </div>
@@ -517,7 +568,7 @@ export default function App() {
           </div>
 
           {flagged.length === 0 ? (
-            <p className="text-[var(--lumon-text-dim)] text-center text-sm">
+            <p className="text-[var(--revue-text-dim)] text-center text-sm">
               No anomalies detected. All bins refined.
             </p>
           ) : (
@@ -525,30 +576,30 @@ export default function App() {
               {flagged.map((f, i) => (
                 <div
                   key={i}
-                  className="bg-[var(--lumon-panel)] border border-[var(--lumon-border)] p-4"
+                  className="bg-[var(--revue-panel)] border border-[var(--revue-border)] p-4"
                 >
                   <div className="flex items-center gap-3 mb-2">
-                    <span className="text-[10px] text-[var(--lumon-text-dim)] tracking-[0.2em] uppercase">
+                    <span className="text-[10px] text-[var(--revue-text-dim)] tracking-[0.2em] uppercase">
                       Bin {String(f.index + 1).padStart(2, "0")}
                     </span>
-                    <span className="text-[10px] text-[var(--lumon-yellow)] tracking-wider uppercase">
+                    <span className="text-[10px] text-[var(--revue-yellow)] tracking-wider uppercase">
                       {f.chunk.category}
                     </span>
                   </div>
-                  <p className="text-[var(--lumon-white)] text-sm mb-1">
+                  <p className="text-[var(--revue-white)] text-sm mb-1">
                     {f.chunk.summary}
                   </p>
-                  <p className="text-[var(--lumon-text-dim)] text-xs mb-2">
+                  <p className="text-[var(--revue-text-dim)] text-xs mb-2">
                     {f.chunk.files}
                   </p>
                   <div
-                    className="border-l-2 border-[var(--lumon-yellow)] pl-3 mt-2"
+                    className="border-l-2 border-[var(--revue-yellow)] pl-3 mt-2"
                     style={{
                       background:
                         "linear-gradient(90deg, rgba(212, 170, 92, 0.05), transparent)",
                     }}
                   >
-                    <p className="text-[var(--lumon-yellow)] text-sm whitespace-pre-wrap">
+                    <p className="text-[var(--revue-yellow)] text-sm whitespace-pre-wrap">
                       {f.note}
                     </p>
                   </div>
@@ -569,7 +620,7 @@ export default function App() {
                     .join("\n---\n\n");
                   navigator.clipboard.writeText(text);
                 }}
-                className="px-4 py-2 text-xs tracking-wider text-[var(--lumon-cyan)] border border-[var(--lumon-border)] hover:border-[var(--lumon-cyan)] transition-colors uppercase"
+                className="px-4 py-2 text-xs tracking-wider text-[var(--revue-cyan)] border border-[var(--revue-border)] hover:border-[var(--revue-cyan)] transition-colors uppercase"
               >
                 Export Report
               </button>
@@ -580,7 +631,7 @@ export default function App() {
                 setChunks([]);
                 setFlagged([]);
               }}
-              className="px-4 py-2 text-xs tracking-wider text-[var(--lumon-text-dim)] border border-[var(--lumon-border)] hover:border-[var(--lumon-text-dim)] transition-colors uppercase"
+              className="px-4 py-2 text-xs tracking-wider text-[var(--revue-text-dim)] border border-[var(--revue-border)] hover:border-[var(--revue-text-dim)] transition-colors uppercase"
             >
               New Session
             </button>
@@ -619,7 +670,7 @@ export default function App() {
 
 const PROMPTS_CALM = [
   "Press spacebar if the code scares you",
-  "Observe the data carefully",
+  "Observe the changes carefully",
   "Trust your instincts",
 ];
 
@@ -676,10 +727,10 @@ function ReviewPhase({
   );
 
   const borderColor = critical
-    ? "var(--lumon-red)"
+    ? "var(--revue-red)"
     : urgent
-      ? "var(--lumon-yellow)"
-      : "var(--lumon-border)";
+      ? "var(--revue-yellow)"
+      : "var(--revue-border)";
 
   // Vignette intensifies with urgency
   const vignetteOpacity = critical ? 0.5 : urgent ? 0.25 : 0;
@@ -739,21 +790,21 @@ function ReviewPhase({
       {/* Paused — anomaly detected */}
       {paused && (
         <div className="fixed inset-0 bg-black/70 flex items-end justify-center pb-8 z-50">
-          <div className="w-full max-w-2xl mx-6 bg-[var(--lumon-panel)] border border-[var(--lumon-yellow)] p-4">
+          <div className="w-full max-w-2xl mx-6 bg-[var(--revue-panel)] border border-[var(--revue-yellow)] p-4">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <div
                   className="w-2 h-2 rounded-full animate-pulse"
                   style={{
-                    background: "var(--lumon-yellow)",
+                    background: "var(--revue-yellow)",
                     boxShadow: "0 0 8px rgba(212, 170, 92, 0.4)",
                   }}
                 />
-                <span className="text-xs tracking-[0.2em] text-[var(--lumon-yellow)] uppercase">
+                <span className="text-xs tracking-[0.2em] text-[var(--revue-yellow)] uppercase">
                   Anomaly — Bin {String(index + 1).padStart(2, "0")}
                 </span>
               </div>
-              <span className="text-[10px] text-[var(--lumon-text-dim)] tracking-wider">
+              <span className="text-[10px] text-[var(--revue-text-dim)] tracking-wider">
                 ENTER to flag · ESC to dismiss
               </span>
             </div>
@@ -762,7 +813,7 @@ function ReviewPhase({
               value={note}
               onChange={(e) => onNoteChange(e.target.value)}
               placeholder="Tell us why this code scares you..."
-              className="w-full bg-[var(--lumon-bg)] border border-[var(--lumon-border)] px-3 py-2 text-[var(--lumon-white)] text-sm focus:outline-none focus:border-[var(--lumon-yellow)] resize-none"
+              className="w-full bg-[var(--revue-bg)] border border-[var(--revue-border)] px-3 py-2 text-[var(--revue-white)] text-sm focus:outline-none focus:border-[var(--revue-yellow)] resize-none"
               rows={3}
             />
           </div>
@@ -777,10 +828,10 @@ function ReviewPhase({
             className="text-[10px] tracking-[0.2em] uppercase"
             style={{
               color: critical
-                ? "var(--lumon-red)"
+                ? "var(--revue-red)"
                 : urgent
-                  ? "var(--lumon-yellow)"
-                  : "var(--lumon-text-dim)",
+                  ? "var(--revue-yellow)"
+                  : "var(--revue-text-dim)",
               animation: `bin-reveal 0.3s ease-out${critical ? ", glow-pulse 0.8s ease-in-out infinite" : ""}`,
             }}
           >
@@ -788,7 +839,7 @@ function ReviewPhase({
           </span>
         )}
         {flaggedCount > 0 && (
-          <span className="text-[10px] text-[var(--lumon-yellow)] tracking-wider opacity-60">
+          <span className="text-[10px] text-[var(--revue-yellow)] tracking-wider opacity-60">
             {flaggedCount} flagged
           </span>
         )}
