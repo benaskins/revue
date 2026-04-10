@@ -741,6 +741,7 @@ export default function App() {
 
   return (
     <ReviewPhase
+      key={currentIndex}
       chunk={currentChunk}
       index={currentIndex}
       total={chunks.length}
