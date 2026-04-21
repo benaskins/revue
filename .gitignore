@@ -1,2 +1,3 @@
 bin/
 web/node_modules/
+.wrangler/
