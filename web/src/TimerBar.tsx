@@ -42,20 +42,20 @@ export default function TimerBar({
   const critical = progress > 0.9;
 
   const barColor = critical
-    ? "var(--lumon-red)"
+    ? "var(--revue-red)"
     : urgent
-      ? "var(--lumon-yellow)"
-      : "var(--lumon-cyan)";
+      ? "var(--revue-yellow)"
+      : "var(--revue-cyan)";
 
   const glowColor = critical
     ? "rgba(224, 108, 96, 0.6)"
     : urgent
       ? "rgba(212, 170, 92, 0.4)"
-      : "var(--lumon-cyan-glow)";
+      : "var(--revue-cyan-glow)";
 
   return (
     <div className="flex items-center gap-4">
-      <div className="flex-1 h-px bg-[var(--lumon-border)] overflow-hidden relative">
+      <div className="flex-1 h-px bg-[var(--revue-border)] overflow-hidden relative">
         <div
           className="h-full transition-none"
           style={{

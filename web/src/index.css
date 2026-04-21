@@ -1,24 +1,24 @@
 @import "tailwindcss";
 
 :root {
-  --lumon-bg: #0a0d0f;
-  --lumon-panel: #0d1117;
-  --lumon-border: #1a2332;
-  --lumon-cyan: #4fd1c5;
-  --lumon-cyan-dim: rgba(79, 209, 197, 0.15);
-  --lumon-cyan-glow: rgba(79, 209, 197, 0.4);
-  --lumon-text: rgba(79, 209, 197, 0.7);
-  --lumon-text-dim: rgba(79, 209, 197, 0.3);
-  --lumon-white: rgba(200, 230, 225, 0.9);
-  --lumon-red: #e06c60;
-  --lumon-green: #5fba7d;
-  --lumon-yellow: #d4aa5c;
+  --revue-bg: #0f0f0f;
+  --revue-panel: #1a1a1a;
+  --revue-border: #2a2a2a;
+  --revue-cyan: #4fd1c5;
+  --revue-cyan-dim: #1a2e2b;
+  --revue-cyan-glow: rgba(79, 209, 197, 0.4);
+  --revue-text: #b0e0db;
+  --revue-text-dim: #6aada5;
+  --revue-white: #f5f5f0;
+  --revue-red: #e06c60;
+  --revue-green: #5fba7d;
+  --revue-yellow: #d4aa5c;
 }
 
 body {
   margin: 0;
-  background: var(--lumon-bg);
-  color: var(--lumon-text);
+  background: var(--revue-bg);
+  color: var(--revue-text);
   font-family: "SF Mono", ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, monospace;
 }
 
@@ -56,8 +56,8 @@ body::after {
 }
 
 @keyframes glow-pulse {
-  0%, 100% { text-shadow: 0 0 4px var(--lumon-cyan-glow); }
-  50% { text-shadow: 0 0 12px var(--lumon-cyan-glow), 0 0 24px rgba(79, 209, 197, 0.15); }
+  0%, 100% { text-shadow: 0 0 4px var(--revue-cyan-glow); }
+  50% { text-shadow: 0 0 12px var(--revue-cyan-glow), 0 0 24px rgba(79, 209, 197, 0.15); }
 }
 
 @keyframes data-drift {
@@ -72,23 +72,23 @@ body::after {
   100% { opacity: 1; transform: scale(1); }
 }
 
-/* Lumon input styling */
+/* Input styling */
 input[type="url"],
 input[type="password"],
 textarea,
 select {
-  caret-color: var(--lumon-cyan);
+  caret-color: var(--revue-cyan);
 }
 
 input[type="url"]::placeholder,
 input[type="password"]::placeholder,
 textarea::placeholder {
-  color: var(--lumon-text-dim);
+  color: var(--revue-text-dim);
 }
 
 ::selection {
-  background: var(--lumon-cyan-dim);
-  color: var(--lumon-white);
+  background: var(--revue-cyan-dim);
+  color: var(--revue-white);
 }
 
 /* Scrollbar */
@@ -96,9 +96,9 @@ textarea::placeholder {
   width: 4px;
 }
 ::-webkit-scrollbar-track {
-  background: var(--lumon-bg);
+  background: var(--revue-bg);
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--lumon-border);
+  background: var(--revue-border);
   border-radius: 2px;
 }
